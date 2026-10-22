@@ -11,7 +11,7 @@ Owner: Colson Griffith (The Vanity Portrait Studio). Design history and run logs
   - `node e2e.mjs` runs Playwright against the mock. **It must end with `ERRORS: none`.**
 - `supabase/functions/ramp-sync/` – the "Sync from Ramp" button and the daily pull.
   - `ramp.ts`: Ramp client-credentials token and transaction pages.
-  - `categorize.ts`: Claude Messages API with forced tool use. The house rules live in its system prompt.
+  - `categorize.ts`: Claude Messages API with JSON structured output (`output_config.format`). The house rules live in its system prompt.
   - `index.ts`: upserts and placements.
   - Test: `deno run -A supabase/functions/ramp-sync/test.ts`.
 - `supabase/functions/sf-sync/` – delta sync to Salesforce (daily 13:07 UTC + "Sync all"). Test: `deno run -A supabase/functions/sf-sync/test.ts`.

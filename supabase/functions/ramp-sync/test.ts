@@ -95,7 +95,7 @@ globalThis.fetch = (async (input: Request | URL | string, init?: RequestInit) =>
       return { charge_id: id, decision: "unknown", confidence: "low", reason: "No memo and no matching crew." };
     });
     void lineOf;
-    return new Response(JSON.stringify({ content: [{ type: "tool_use", name: "record_placements", input: { placements: pl } }] }));
+    return new Response(JSON.stringify({ stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ placements: pl }) }] }));
   }
   if (u.host === "db.test") {
     if (u.pathname.startsWith("/rest/v1/rpc/app_me")) {
@@ -171,7 +171,7 @@ assert(g.length === 1 && g[0].status === "suggested" && g[0].sf_category === "tr
 assert(T.allocation_current.find((a) => a.id === "A-guess")!.active === false, "old guess deactivated, not deleted");
 const prompt = String((claudeCalls[0].messages as Row[])[0].content);
 assert(!prompt.includes("Lost Gala"), "Closed Lost events never shown to Claude");
-assert(claudeCalls[0].model === "claude-sonnet-5-5" && (claudeCalls[0].tool_choice as Row).name === "record_placements", "forced tool use on the configured model");
+assert(claudeCalls[0].model === "claude-sonnet-5-5" && ((claudeCalls[0].output_config as Row)?.format as Row)?.type === "json_schema" && !claudeCalls[0].tool_choice, "JSON structured output on the configured model");
 const run = T.ramp_sync_run.at(-1)!;
 assert(run.status === "ok" && run.triggered_by === "kiki@thevanityportraitstudio.com", "run logged with who pressed Sync");
 

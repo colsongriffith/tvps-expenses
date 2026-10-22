@@ -1,4 +1,4 @@
-// Asks Claude (Messages API, forced tool use) for a best-guess placement for each new charge.
+// Asks Claude (Messages API, JSON structured output) for a best-guess placement for each new charge.
 // Output is never counted anywhere until a person presses "Add to event" in the app.
 
 export const SF_CATS = ["flights", "baggage", "hotels", "transportation", "per_diem", "other", "mileage"] as const;
@@ -62,18 +62,20 @@ export const TOOL = {
           properties: {
             charge_id: { type: "string" },
             decision: { type: "string", enum: ["event", "overhead", "unknown"] },
-            opportunity_sf_id: { type: ["string", "null"] },
+            opportunity_sf_id: { anyOf: [{ type: "string" }, { type: "null" }] },
             staffing_sf_ids: { type: "array", items: { type: "string" } },
-            category: { type: ["string", "null"], enum: [...SF_CATS, null] },
-            fine_category: { type: ["string", "null"], enum: [...FINE_CATS, null] },
+            category: { anyOf: [{ type: "string", enum: [...SF_CATS] }, { type: "null" }] },
+            fine_category: { anyOf: [{ type: "string", enum: [...FINE_CATS] }, { type: "null" }] },
             confidence: { type: "string", enum: ["high", "medium", "low"] },
             reason: { type: "string" },
           },
-          required: ["charge_id", "decision", "confidence", "reason"],
+          required: ["charge_id", "decision", "opportunity_sf_id", "staffing_sf_ids", "category", "fine_category", "confidence", "reason"],
+          additionalProperties: false,
         },
       },
     },
     required: ["placements"],
+    additionalProperties: false,
   },
 };
 
@@ -97,7 +99,7 @@ export function prompt(charges: Charge[], events: Event[]): string {
     merchant_category: c.merchant_category, memo: c.memo, card_holder: c.card_holder, is_ops_buyer: c.is_ops_buyer,
   }));
   return `Events (Booked / Closed Won / Photos Delivered) near these dates, with crews:\n${JSON.stringify(ev)}\n\n` +
-    `Charges to place (${ch.length}):\n${JSON.stringify(ch)}\n\nCall record_placements with exactly one placement per charge_id.`;
+    `Charges to place (${ch.length}):\n${JSON.stringify(ch)}\n\nReturn exactly one placement per charge_id.`;
 }
 
 type Fetch = typeof fetch;
@@ -108,18 +110,21 @@ export async function askClaude(apiKey: string, model: string, charges: Charge[]
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
       model,
-      max_tokens: 8000,
+      max_tokens: 16000,
       system: SYSTEM,
-      tools: [TOOL],
-      tool_choice: { type: "tool", name: TOOL.name },
+      // JSON structured output: the reply is guaranteed to match the schema.
+      output_config: { format: { type: "json_schema", schema: TOOL.input_schema } },
       messages: [{ role: "user", content: prompt(charges, events) }],
     }),
   });
   const b = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(`Claude request failed (${r.status}): ${b.error?.message || JSON.stringify(b).slice(0, 300)}`);
+  if (b.stop_reason === "refusal") throw new Error("Claude declined this batch");
   // deno-lint-ignore no-explicit-any
-  const use = (b.content || []).find((c: any) => c.type === "tool_use" && c.name === TOOL.name);
-  return (use?.input?.placements || []) as Placement[];
+  const text = (b.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+  let out: { placements?: Placement[] } = {};
+  try { out = JSON.parse(text); } catch { throw new Error(`Claude reply was not complete JSON (stop: ${b.stop_reason})`); }
+  return out.placements || [];
 }
 
 export type AllocRow = {
