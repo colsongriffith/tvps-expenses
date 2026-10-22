@@ -173,7 +173,7 @@ export function toRows(charge: Charge, p: Placement | undefined, events: Event[]
     };
   }
   const n = uniq.length, base = Math.trunc(amt / n), rem = amt - base * n;
-  const conf = n > 1 && p.confidence === "high" ? "high" : p.confidence;
+  const conf = p.confidence;
   return {
     rows: uniq.map((c, i) => ({
       expense_line_id: charge.line_id, staffing_sf_id: c.staffing_sf_id, opportunity_sf_id: ev.opportunity_sf_id,

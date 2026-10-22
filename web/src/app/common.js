@@ -96,20 +96,34 @@ const Icon = {
   sync: () => html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12A9 9 0 0 1 18.5 5.8"/><path d="M21 4v5h-5M3 20v-5h5"/></svg>`,
 };
 
+// Supabase answers at most 1000 rows per request, so the big views are read a page at a time.
+const PAGE = 1000;
+async function all(table, order) {
+  const out = [];
+  for (let from = 0; ; from += PAGE) {
+    let q = sb.from(table).select("*");
+    if (order) q = q.order(order.col, { ascending: !order.desc });
+    if (order?.then) q = q.order(order.then, { ascending: true });
+    const { data, error } = await q.range(from, from + PAGE - 1);
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < PAGE) return out;
+  }
+}
+
 async function loadAll() {
-  const [ev, ln, cr, rc, sq, sf, sr, rr] = await Promise.all([
-    sb.from("v_app_event").select("*").order("event_date", { ascending: false }),
-    sb.from("v_app_line").select("*"),
-    sb.from("v_app_crew").select("*"),
-    sb.from("v_app_reconciliation").select("*"),
-    sb.from("v_app_sync_queue").select("*"),
-    sb.from("v_app_sync_flag").select("*"),
+  const [events, lines, crew, recon, syncQueue, syncFlags, sr, rr] = await Promise.all([
+    all("v_app_event", { col: "event_date", desc: true, then: "opportunity_sf_id" }),
+    all("v_app_line", { col: "allocation_id" }),
+    all("v_app_crew", { col: "staffing_sf_id" }),
+    all("v_app_reconciliation", { col: "staffing_sf_id", then: "sf_category" }),
+    all("v_app_sync_queue", { col: "staffing_sf_id", then: "sf_category" }),
+    all("v_app_sync_flag", { col: "id" }),
     sb.from("sf_sync_run").select("*").order("started_at", { ascending: false }).limit(15),
     sb.from("ramp_sync_run").select("*").order("started_at", { ascending: false }).limit(5),
   ]);
-  for (const r of [ev, ln, cr, rc, sq, sf, sr]) if (r.error) throw r.error;
-  return { events: ev.data, lines: ln.data, crew: cr.data, recon: rc.data, syncQueue: sq.data, syncFlags: sf.data, syncRuns: sr.data,
-    rampRuns: rr.error ? [] : rr.data };
+  if (sr.error) throw sr.error;
+  return { events, lines, crew, recon, syncQueue, syncFlags, syncRuns: sr.data, rampRuns: rr.error ? [] : rr.data };
 }
 
 // Every edit is an override row; the database places the charge and keeps the history.

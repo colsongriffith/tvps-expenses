@@ -164,8 +164,9 @@ assert(active("r-new4")[0].status === "held" && active("r-new4")[0].confidence =
 const n5 = active("r-new5")[0];
 assert(n5.status === "held" && n5.opportunity_sf_id === "E-roots" && n5.staffing_sf_id === null, "staff not on crew -> held with event kept as a hint");
 assert(line("r-old").memo === "Roots hotel" && line("r-old").amount_cents === 5250 && line("r-old").state === "cleared", "existing line refreshed: memo, amount, pending->cleared");
-assert(active("r-old").length === 1 && active("r-old")[0].id === "A-old", "person-placed charge NOT re-guessed");
-assert(/Hilton changed to \$52.50/.test(j.message), "amount change on a placed charge is reported");
+assert(active("r-old").length === 1 && active("r-old")[0].id === "A-old" && active("r-old")[0].status === "proposed", "person-placed charge NOT re-guessed");
+assert(active("r-old")[0].amount_cents === 5250, "...but its share follows the new amount (tip settled)");
+assert(/Hilton is now \$52.50/.test(j.message), "amount change on a placed charge is reported");
 const g = active("r-guess");
 assert(g.length === 1 && g[0].status === "suggested" && g[0].sf_category === "transportation", "auto-guessed charge re-guessed after its memo arrived");
 assert(T.allocation_current.find((a) => a.id === "A-guess")!.active === false, "old guess deactivated, not deleted");
@@ -188,6 +189,17 @@ assert(j.new_lines === 1 && active("r-new6")[0].basis === "pending_claude" && j.
 Deno.env.set("ANTHROPIC_API_KEY", "sk");
 j = await (await call({ "x-cron-key": "k" })).json();
 assert(active("r-new6").length === 1 && active("r-new6")[0].basis !== "pending_claude", "next run with Claude categorizes the waiting charge");
+
+// 6. a placed charge voided in Ramp comes off its event; a split keeps its proportions when the amount changes
+const { resize } = await import("./index.ts");
+assert(resize([1000, 1000], 2501).join() === "1250,1251" && resize([3000, 1000], 1000).join() === "750,250" && resize([0, 0], 7).join() === "4,3" && resize([-500], -700).join() === "-700", "resize keeps proportions to the cent");
+T.allocation_current.push({ id: "A-void", expense_line_id: line("r-new3").id, status: "written", basis: "override", override_id: "O2", active: true, amount_cents: 2000 });
+(rampPages[1].data as Row[]).find((t) => t.id === "r-new3")!.state = "CANCELED";
+(rampPages[1].data as Row[]).find((t) => t.id === "r-new6")!.state = "DECLINED";
+j = await (await call({ "x-cron-key": "k" })).json();
+assert(line("r-new3").state === "void" && active("r-new3").length === 0 && /2 voided in Ramp and taken off their events: Anthropic, Starbucks/.test(j.message), "canceled charge -> void, every placement retired, reported");
+assert(line("r-new6").state === "void" && active("r-new6").length === 0, "a stored charge that Ramp later declines is voided too");
+assert(j.categorized === 0, "voided charges are not re-guessed");
 
 console.log(failed ? `\n${failed} FAILED` : "\nALL RAMP-SYNC TESTS PASSED");
 if (failed) Deno.exit(1);

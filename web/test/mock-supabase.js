@@ -108,7 +108,7 @@ rows = rows.map((r) => ({ ...r, allocated_cents: r.allocated_cents ?? r.line_cen
 
 class Q {
   constructor(t) { this.t = t; this.op = "select"; }
-  select() { return this; } order() { return this; } limit() { return this; } eq() { return this; } gte() { return this; }
+  select() { return this; } order() { return this; } limit() { return this; } eq() { return this; } gte() { return this; } range() { return this; }
   insert(p) { this.op = "insert"; this.p = p; return this; }
   then(res, rej) {
     try {
@@ -125,7 +125,7 @@ class Q {
   }
 }
 export function createClient() {
-  const session = { access_token: "tok", user: { email: "colson@thevanityportraitstudio.com" } };
+  const session = { access_token: "tok", user: { id: "u-colson", email: "colson@thevanityportraitstudio.com" } };
   return {
     auth: {
       getSession: async () => ({ data: { session } }),

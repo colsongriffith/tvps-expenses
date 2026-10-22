@@ -35,15 +35,17 @@ function App() {
   const say = useCallback((t) => { setToast(t); setTimeout(() => setToast(""), 4500); }, []);
   const changed = useCallback(async (msg) => { await refresh(); if (msg) say(msg); }, [refresh, say]);
 
+  // Load once per signed-in user, not on every hourly token refresh.
+  const userId = session?.user?.id || session?.user?.email;
   useEffect(() => {
-    if (!session) return;
+    if (!userId) return;
     (async () => {
       const { data, error } = await sb.rpc("app_me");
       if (error) { setErr(error.message); return; }
       setMe(data?.[0] || null);
       await refresh();
     })();
-  }, [session, refresh]);
+  }, [userId, refresh]);
 
   useEffect(() => {
     const hh = () => {

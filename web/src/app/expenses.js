@@ -20,14 +20,14 @@ function buildCharges(lines) {
     if (!c) {
       c = { id: l.expense_line_id, date: l.charge_date, payer: l.payer_full_name || l.payer_name || "—", payerContact: l.payer_contact_sf_id,
         japhy: /^japhy\b/i.test(l.payer_full_name || l.payer_name || ""), merchant: l.merchant_name, memo: l.memo, source: l.source, amount: l.line_cents,
-        fine: l.fine_category, pending: l.clear_state === "pending", allocs: [] };
+        fine: l.fine_category, pending: l.clear_state === "pending", voided: l.clear_state === "void", allocs: [] };
       m.set(l.expense_line_id, c);
     }
     c.allocs.push(l);
   }
   for (const c of m.values()) {
     const st = new Set(c.allocs.map((a) => a.status));
-    c.bucket = st.has("overhead") ? "overhead" : (st.has("held") || st.has("suggested")) ? "todo" : "added";
+    c.bucket = st.has("overhead") ? "overhead" : (st.has("held") || st.has("suggested")) ? (c.voided ? "overhead" : "todo") : "added";
     c.suggested = st.has("suggested");
     const a0 = c.allocs[0];
     c.conf = confOf(c, a0);
@@ -193,7 +193,13 @@ function ChargeRow({ c, d, crewBy, staffedBy, today, queued, user, onSaved, onOp
   const choices = useMemo(() => eventChoices(c, d.events, staffedBy, more, today), [c, d.events, staffedBy, more, today]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  useEffect(() => { setDraft(c.saved); setErr(""); }, [c]);
+  // Data refreshes after every save on the page. Only reset this row's picks when ITS saved placement changed,
+  // so half-finished choices on other rows survive.
+  const lastSaved = useRef(c.saved);
+  useEffect(() => {
+    if (same(lastSaved.current, c.saved)) return;
+    lastSaved.current = c.saved; setDraft(c.saved); setErr("");
+  }, [c.saved]);
   const crew = draft.event && draft.event !== OVERHEAD ? (crewBy[draft.event] || []) : [];
   const dirty = !same(draft, c.saved);
   const isOverhead = draft.event === OVERHEAD;
@@ -230,7 +236,7 @@ function ChargeRow({ c, d, crewBy, staffedBy, today, queued, user, onSaved, onOp
   const conf = c.conf && !dirty ? c.conf : null;
   return html`<tr class="xr ${c.bucket} ${conf ? "conf-" + conf.level : ""}">
     <td class="date-c">${fmtDate(c.date)}</td>
-    <td class="card-c"><div class="b">${c.payer}</div><div><${Src} s=${c.source}/>${c.japhy ? html`<span class="chip jc" title="Bought on Japhy's card. Choose the staff it was for.">Japhy's card</span>` : ""}${c.pending ? html`<span class="chip">pending</span>` : ""}</div></td>
+    <td class="card-c"><div class="b">${c.payer}</div><div><${Src} s=${c.source}/>${c.japhy ? html`<span class="chip jc" title="Bought on Japhy's card. Choose the staff it was for.">Japhy's card</span>` : ""}${c.pending ? html`<span class="chip">pending</span>` : ""}${c.voided ? html`<span class="chip" title="Ramp voided this charge. It is not a cost.">voided</span>` : ""}</div></td>
     <td class="memo-c"><div class="merch">${c.merchant || "(no merchant)"}</div><div class="memo ${c.memo ? "" : "none"}">${c.memo || "no memo in Ramp"}</div>
       ${conf ? html`<div class="cf-box"><div class="cf-line"><span class="cf ${conf.level}" title=${CONF[conf.level].help + "\n\n" + conf.reason}><span class="dot"></span>${CONF[conf.level].label}</span>${c.bucket === "todo" && c.suggested ? html`<span class="xs guess">Best guess${evName ? " · " + evName : ""}</span>` : ""}</div>
         ${conf.level !== "high" ? html`<div class="xs cf-why">${conf.reason}</div>` : ""}</div>` : ""}

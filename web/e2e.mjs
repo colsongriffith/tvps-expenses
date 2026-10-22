@@ -58,8 +58,12 @@ const gusto = row("Drip Drop Coffee");
 check(await gusto.locator(".src", { hasText: "Gusto" }).count() === 1, "Gusto source shown");
 check(await gusto.locator(".guess").textContent().then((t) => t.includes("Best guess")), "best guess label");
 check(await gusto.locator(".sp-btn").textContent().then((t) => t.includes("Kiki Dickie")), "guessed staff pre-ticked");
+// half-finished picks on another row must survive this save
+await row("Doordash").locator(".cat-c select").selectOption("hotels");
 await gusto.locator("button", { hasText: "Add to event" }).click();
 await page.waitForSelector(".toast >> text=Added to the event.");
+check(await row("Doordash").locator(".cat-c select").inputValue() === "hotels", "picks on another row survive a save elsewhere");
+await row("Doordash").locator(".cat-c select").selectOption("per_diem");
 let o = await last();
 check(o.action === "reassign" && o.staffing_sf_id === "S2" && o.sf_category === "per_diem", "Add sends reassign to Kiki / Per Diem");
 check(await row("Drip Drop Coffee").count() === 0, "added charge leaves Not added");

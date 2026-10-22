@@ -7,7 +7,8 @@
 // Rules:
 //   - Re-pulls a rolling window (last charge date minus 60 days) so memo edits and pending→cleared changes are picked up.
 //   - New charges land as `suggested` / `held` / high-confidence `overhead`. Nothing counts until someone presses Add.
-//   - A charge a person has already placed is never re-guessed. If its amount changes in Ramp it is reported, not moved.
+//   - A charge a person has already placed is never re-guessed. If its amount changes in Ramp, the placement is kept and
+//     the shares are resized to the new total (reported in the run message). Voided charges lose their placements.
 //   - Dates are the UTC date of the card transaction (the convention every run has used).
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { rampToken, rampTransactions } from "./ramp.ts";
@@ -31,6 +32,19 @@ const json = (b: unknown, status = 200) =>
 const isAuto = (basis: string | null) => !!basis && AUTO_BASES.some((b) => basis.startsWith(b));
 const lineState = (s: string): "pending" | "cleared" | "void" | null =>
   s === "PENDING" ? "pending" : ["DECLINED", "ERROR"].includes(s) ? null : ["CANCELED", "CANCELLED", "VOID", "VOIDED"].includes(s) ? "void" : "cleared";
+
+// Scale a set of shares to a new total, to the cent. Even split when the old shares add to zero.
+export function resize(shares: number[], total: number): number[] {
+  const n = shares.length;
+  if (!n) return [];
+  const old = shares.reduce((s, x) => s + x, 0);
+  const out = old === 0 ? shares.map(() => Math.trunc(total / n)) : shares.map((x) => Math.round(x * total / old));
+  const diff = total - out.reduce((s, x) => s + x, 0);
+  let big = 0;
+  for (let i = 1; i < n; i++) if (Math.abs(out[i]) > Math.abs(out[big])) big = i;
+  out[big] += diff;
+  return out;
+}
 
 async function chunked<T>(ids: string[], size: number, fn: (part: string[]) => Promise<T[]>): Promise<T[]> {
   const out: T[] = [];
@@ -97,7 +111,8 @@ export async function handler(req: Request, deps: { fetch?: typeof fetch; db?: S
 
   try {
     const token = await rampToken(rampId, rampSecret, f);
-    const txns = (await rampTransactions(token, from, f)).filter((t) => t.utcDate && lineState(t.state));
+    // Dedupe by id (a page boundary can shift mid-pull) and drop anything without a date.
+    const txns = [...new Map((await rampTransactions(token, from, f)).filter((t) => t.utcDate).map((t) => [t.id, t])).values()];
 
     // people by Ramp user id
     const { data: people } = await db.from("person").select("id, full_name, contact_sf_id, ramp_user_uuid, is_ops_buyer");
@@ -114,12 +129,16 @@ export async function handler(req: Request, deps: { fetch?: typeof fetch; db?: S
     const byExt = new Map(existing.map((e) => [e.external_id as string, e]));
 
     const toInsert: Record<string, unknown>[] = [], memoChanged: string[] = [], amountChanged: { id: string; cents: number; merchant: string | null }[] = [];
-    let updated = 0;
+    const voided: { id: string; merchant: string | null }[] = [];
+    let updated = 0, skipped = 0;
     for (const t of txns) {
       const person = t.userId ? byRamp.get(t.userId) : undefined;
-      const st = lineState(t.state)!;
       const e = byExt.get(t.id);
+      // Declined / errored charges never land. One that was pending here and then declined becomes void.
+      const st = lineState(t.state) ?? (e ? "void" : null);
+      if (!st) { skipped++; continue; }
       if (!e) {
+        if (st === "void") continue;
         toInsert.push({
           source_id: RAMP_SOURCE, external_id: t.id, txn_date: t.utcDate, amount_cents: t.amountCents,
           direction: t.amountCents < 0 ? "credit" : "debit", merchant_name: t.merchant, merchant_category_raw: t.merchantCategory,
@@ -132,7 +151,7 @@ export async function handler(req: Request, deps: { fetch?: typeof fetch; db?: S
       }
       const patch: Record<string, unknown> = {};
       if ((e.memo || null) !== (t.memo || null)) { patch.memo = t.memo; memoChanged.push(e.id as string); }
-      if (e.state !== st) patch.state = st;
+      if (e.state !== st) { patch.state = st; if (st === "void") voided.push({ id: e.id as string, merchant: t.merchant }); }
       if (e.amount_cents !== t.amountCents) {
         patch.amount_cents = t.amountCents;
         patch.direction = t.amountCents < 0 ? "credit" : "debit";
@@ -154,16 +173,24 @@ export async function handler(req: Request, deps: { fetch?: typeof fetch; db?: S
         })).map((r) => r.id as string)
       : [];
 
+    // ---- voided charges are not a cost any more: retire every placement (Salesforce gets the delta on the next sync)
+    if (voided.length) {
+      const { error } = await db.from("allocation_current").update({ active: false, superseded_at: new Date().toISOString() })
+        .eq("active", true).in("expense_line_id", voided.map((v) => v.id));
+      if (error) throw new Error(error.message);
+    }
+    const isVoid = new Set(voided.map((v) => v.id));
+
     // ---- which lines Claude should (re)guess
-    const touched = [...new Set([...memoChanged, ...amountChanged.map((a) => a.id)])];
+    const touched = [...new Set([...memoChanged, ...amountChanged.map((a) => a.id)])].filter((id) => !isVoid.has(id));
     const { data: pendingHeld } = await db.from("allocation_current").select("expense_line_id")
       .eq("active", true).eq("basis", "pending_claude");
-    const candidates = [...new Set([...touched, ...(pendingHeld || []).map((r) => r.expense_line_id as string)])];
+    const candidates = [...new Set([...touched, ...(pendingHeld || []).map((r) => r.expense_line_id as string)])].filter((id) => !isVoid.has(id));
     const attention: string[] = [];
     const reguess: string[] = [];
     if (candidates.length) {
       const allocs = await chunked(candidates, 150, async (part) => {
-        const { data, error } = await db.from("allocation_current").select("id, expense_line_id, status, basis, override_id")
+        const { data, error } = await db.from("allocation_current").select("id, expense_line_id, status, basis, override_id, amount_cents")
           .eq("active", true).in("expense_line_id", part);
         if (error) throw new Error(error.message);
         return data || [];
@@ -175,8 +202,16 @@ export async function handler(req: Request, deps: { fetch?: typeof fetch; db?: S
         const untouched = rows.every((r) => !r.override_id && ["suggested", "held"].includes(r.status as string) && isAuto(r.basis as string));
         if (untouched) reguess.push(id);
         else if (amountChanged.some((a) => a.id === id)) {
+          // A person placed this charge and its amount then changed in Ramp (a tip settling, say).
+          // Keep their placement; resize the shares to the new total so Salesforce gets the right number.
           const a = amountChanged.find((x) => x.id === id)!;
-          attention.push(`${a.merchant || "A charge"} changed to $${(a.cents / 100).toFixed(2)} in Ramp after it was placed`);
+          const next = resize(rows.map((r) => r.amount_cents as number), a.cents);
+          for (let k = 0; k < rows.length; k++) {
+            if (rows[k].amount_cents === next[k]) continue;
+            const { error } = await db.from("allocation_current").update({ amount_cents: next[k], updated_at: new Date().toISOString() }).eq("id", rows[k].id);
+            if (error) throw new Error(error.message);
+          }
+          attention.push(`${a.merchant || "A charge"} is now $${(a.cents / 100).toFixed(2)} in Ramp; its placement was kept and the amount updated`);
         }
       }
     }
@@ -274,15 +309,17 @@ export async function handler(req: Request, deps: { fetch?: typeof fetch; db?: S
       await db.from("expense_line").update({ intent: u.intent, ...(u.fine_category ? { fine_category: u.fine_category } : {}) }).eq("id", u.id);
     }
 
-    const parts = [`Pulled ${txns.length} charges from Ramp since ${from}.`,
+    const fetched = txns.length - skipped;
+    const parts = [`Pulled ${fetched} charges from Ramp since ${from}.`,
       inserted.length ? `${inserted.length} new.` : "Nothing new.",
       updated ? `${updated} updated (memo, amount or pending→cleared).` : "",
+      voided.length ? `${voided.length} voided in Ramp and taken off ${voided.length === 1 ? "its" : "their"} event${voided.length === 1 ? "" : "s"}: ${voided.slice(0, 3).map((v) => v.merchant || "a charge").join(", ")}${voided.length > 3 ? "…" : ""}.` : "",
       charges.length - waiting ? `Claude pre-filled ${charges.length - waiting}: ${conf.high} green, ${conf.medium} orange, ${conf.low} red.` : "",
       waiting + later.length ? `${waiting + later.length} still waiting for Claude; they'll be done on the next sync.` : "",
       attention.length ? `Check: ${attention.slice(0, 3).join("; ")}${attention.length > 3 ? ` and ${attention.length - 3} more` : ""}.` : "",
       claudeNote ? `Note: ${claudeNote}` : ""].filter(Boolean);
     return await finish(waiting || later.length ? "partial" : "ok", {
-      fetched: txns.length, new_lines: inserted.length, updated_lines: updated, categorized: charges.length - waiting,
+      fetched, new_lines: inserted.length, updated_lines: updated, categorized: charges.length - waiting,
       high: conf.high, medium: conf.medium, low: conf.low, message: parts.join(" "),
     });
   } catch (e) {
