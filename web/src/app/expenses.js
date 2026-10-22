@@ -232,14 +232,12 @@ function ChargeRow({ c, d, crewBy, staffedBy, today, queued, user, onSaved, onOp
     action = html`<div class="row" style="gap:6px;flex-wrap:nowrap"><${Badge} s=${lineStatus(a, queued)}/><a class="xs" onClick=${remove} title="Send it back to Not added">Remove</a></div>`;
   } else action = html`<button class="btn small" disabled=${busy} onClick=${add}>${busy ? "Saving…" : c.bucket === "added" ? "Save change" : "Add to event"}</button>`;
 
-  const evName = d.events.find((e) => e.opportunity_sf_id === c.saved.event)?.opportunity_name;
   const conf = c.conf && !dirty ? c.conf : null;
   return html`<tr class="xr ${c.bucket} ${conf ? "conf-" + conf.level : ""}">
     <td class="date-c">${fmtDate(c.date)}</td>
     <td class="card-c"><div class="b">${c.payer}</div><div><${Src} s=${c.source}/>${c.japhy ? html`<span class="chip jc" title="Bought on Japhy's card. Choose the staff it was for.">Japhy's card</span>` : ""}${c.pending ? html`<span class="chip">pending</span>` : ""}${c.voided ? html`<span class="chip" title="Ramp voided this charge. It is not a cost.">voided</span>` : ""}</div></td>
     <td class="memo-c"><div class="merch">${c.merchant || "(no merchant)"}</div><div class="memo ${c.memo ? "" : "none"}">${c.memo || "no memo in Ramp"}</div>
-      ${conf ? html`<div class="cf-box"><div class="cf-line"><span class="cf ${conf.level}" title=${CONF[conf.level].help + "\n\n" + conf.reason}><span class="dot"></span>${CONF[conf.level].label}</span>${c.bucket === "todo" && c.suggested ? html`<span class="xs guess">Best guess${evName ? " · " + evName : ""}</span>` : ""}</div>
-        ${conf.level !== "high" ? html`<div class="xs cf-why">${conf.reason}</div>` : ""}</div>` : ""}
+      ${conf ? html`<div class="cf-line"><span class="cf ${conf.level}" title=${CONF[conf.level].help}><span class="dot"></span>${CONF[conf.level].label}</span>${conf.level !== "high" ? html`<span class="cf-why" title=${conf.reason}>${conf.reason}</span>` : ""}</div>` : ""}
       ${c.bucket === "added" && c.saved.event ? html`<div class="xs"><a onClick=${() => onOpenEvent(c.saved.event)}>Open event →</a></div>` : ""}
       ${err && html`<div class="xs" style="color:var(--bad)">${err}</div>`}</td>
     <td class="money b">${$(c.amount)}</td>
@@ -326,20 +324,21 @@ function Expenses({ d, user, onChanged, onOpenEvent, focusEvent, clearFocus }) {
 
   return html`<div>
     <div class="page-h"><div><h2>Expenses</h2>
-      <div class="lead">Every Ramp, Gusto and Capital One charge, newest first. Press <b>Sync from Ramp</b> to pull new charges; Claude pre-fills its best guess. Check the event, tick the staff it was for and press <b>Add to event</b>. Event totals and Salesforce only count charges that have been added.</div></div>
+      <div class="lead">Every card charge, newest first. Check the event and staff Claude suggested, then press <b>Add to event</b>. Nothing counts until it's added.</div></div>
       <${RampSyncButton} d=${d} user=${user} onDone=${onChanged}/></div>
-    ${focusEvent && html`<div class="note blue" style="margin-bottom:12px">Showing charges for <b>${evName[focusEvent] || "this event"}</b>. <a onClick=${clearFocus}>Show every charge</a></div>`}
-    <div class="card"><div class="row">
+    ${focusEvent && html`<div class="note blue" style="margin-bottom:14px">Showing charges for <b>${evName[focusEvent] || "this event"}</b>. <a onClick=${clearFocus}>Show every charge</a></div>`}
+    <div class="toolbar">
       <div class="seg light">${BUCKETS.map((b) => html`<button key=${b.k} class=${bucket === b.k ? "on" : ""} onClick=${() => setBucket(b.k)}>${b.label}<span class="n">${counts[b.k]}</span></button>`)}</div>
-    </div><div class="row" style="margin-top:10px">
       <div class="search"><${Icon.search}/><input type="text" placeholder="Search merchant, memo, card, event or amount" value=${q} onInput=${(e) => setQ(e.target.value)}/></div>
       <select value=${payer} onChange=${(e) => setPayer(e.target.value)} aria-label="Card"><option value="">Every card</option>${payers.map((p) => html`<option key=${p} value=${p}>${p}</option>`)}</select>
       <select value=${src} onChange=${(e) => setSrc(e.target.value)} aria-label="Source"><option value="">Every source</option><option value="Ramp">Ramp</option><option value="Gusto">Gusto</option><option value="Capital One">Capital One</option><option value="Manual">Manual entry</option></select>
-    </div></div>
-    ${showLegend && html`<div class="cf-legend"><span class="xs mute">How sure the pre-filled guess is:</span>
-      ${["high", "medium", "low"].map((k) => html`<button key=${k} type="button" class="cf-chip ${k} ${cf === k ? "on" : ""}" title=${CONF[k].help} onClick=${() => setCf(cf === k ? "" : k)}><span class="dot"></span>${CONF[k].label}<span class="n">${confN[k]}</span></button>`)}
-      ${cf && html`<a class="xs" onClick=${() => setCf("")}>Show all</a>`}</div>`}
-    <div class="xs mute" style="margin:0 2px 8px">${rows.length} charge${rows.length === 1 ? "" : "s"} · ${$(total)}</div>
+    </div>
+    <div class="count-line">
+      ${showLegend ? html`<div class="cf-legend" style="margin:0">
+        ${["high", "medium", "low"].map((k) => html`<button key=${k} type="button" class="cf-chip ${k} ${cf === k ? "on" : ""}" title=${CONF[k].help} onClick=${() => setCf(cf === k ? "" : k)}><span class="dot"></span>${CONF[k].label}<span class="n">${confN[k]}</span></button>`)}
+        ${cf && html`<a class="xs" onClick=${() => setCf("")}>Show all</a>`}</div>` : html`<span></span>`}
+      <span class="xs mute">${rows.length} charge${rows.length === 1 ? "" : "s"} · ${$(total)}</span>
+    </div>
     <div class="card flush gridwrap"><table class="xtab">
       <thead><tr><th>Date</th><th>Card</th><th>Merchant · memo</th><th class="money">Amount</th><th>Event</th><th>Staff</th><th>Category</th><th></th></tr></thead>
       <tbody>${shown.map((c) => html`<${ChargeRow} key=${c.id} c=${c} d=${d} crewBy=${crewBy} staffedBy=${staffedBy} today=${today} queued=${queued} user=${user} onSaved=${onChanged} onOpenEvent=${onOpenEvent}/>`)}</tbody>

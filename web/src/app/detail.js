@@ -126,7 +126,7 @@ function EventDetail({ d, oppId, onBack, backLabel, user, onChanged, onOpenExpen
     <div class="page-h"><div>
       <h2>${ev.opportunity_name}</h2>
       <div class="lead">${fmtDate(ev.event_date)} · ${place(ev) || "no venue on record"} · ${ev.stage} · ${crew.length} on crew</div>
-    </div><button class="btn sec" onClick=${() => onOpenExpenses(oppId)}>This event's charges on the Expenses tab</button></div>
+    </div><button class="btn sec" onClick=${() => onOpenExpenses(oppId)}>Open in Expenses</button></div>
 
     ${pre && html`<div class="note grey" style="margin-bottom:14px">This event is before 7 Sep, when the tool started. Its Salesforce totals were keyed by hand and the placements here are estimates. You can still move charges, but nothing on this event syncs to Salesforce.</div>`}
 
@@ -138,7 +138,8 @@ function EventDetail({ d, oppId, onBack, backLabel, user, onChanged, onOpenExpen
     </div>
 
     ${(queue.length > 0 || flags.length > 0) && html`<div class="note blue" style="margin:0 0 14px">
-      ${queue.length > 0 && html`<div><b>${queue.length} Salesforce field${queue.length === 1 ? "" : "s"}</b> on this event will change on the next sync: ${queue.map((q) => `${q.full_name || "?"} ${CAT_LABEL[q.sf_category]} ${q.delta_cents > 0 ? "+" : ""}${$(q.delta_cents)}`).join(" · ")}</div>`}
+      ${queue.length > 0 && html`<div><b>${queue.length} Salesforce field${queue.length === 1 ? "" : "s"}</b> on this event will change on the next sync.
+        <div class="qchips">${queue.map((q) => html`<span key=${q.staffing_sf_id + q.sf_category} class="qchip">${q.full_name || "(open slot)"} · ${CAT_LABEL[q.sf_category]} <b>${q.delta_cents > 0 ? "+" : ""}${$(q.delta_cents)}</b></span>`)}</div></div>`}
       ${flags.length > 0 && html`<div style="margin-top:4px"><b>${flags.length} field${flags.length === 1 ? " was" : "s were"} changed in Salesforce by hand</b>, so the sync is leaving ${flags.length === 1 ? "it" : "them"} alone. See the Salesforce sync tab.</div>`}
     </div>`}
 
@@ -156,7 +157,7 @@ function EventDetail({ d, oppId, onBack, backLabel, user, onChanged, onOpenExpen
         })}<td class="money ${billedT && spentT > billedT ? "bad" : "ok"}">${$(billedT - spentT)}</td><td></td></tr>
       </tfoot>
     </table></div>
-    <div class="legend" style="margin-top:8px"><span>Only charges added on the Expenses tab count here. Change the person or category with the dropdowns under a charge, or remove it to send it back.</span><span>Positive "Billed − spent" means budget left; negative means over.</span></div>
+    <div class="legend" style="margin-top:10px"><span>Only added charges count here. Use the dropdowns under a charge to move it, or remove it to send it back to Expenses.</span></div>
   </div>`;
 }
 

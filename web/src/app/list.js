@@ -23,7 +23,7 @@ function EventList({ d, onOpen, mode, cutoff }) {
   return html`<div>
     <div class="page-h"><div>
       <h2>${mode === "past" ? "Past events" : "Current events"}</h2>
-      <div class="lead">${mode === "past" ? html`Events more than 30 days old (before ${fmtDate(cutoff)}).` : html`The last 30 days and everything upcoming, newest first. Open an event to see its added charges by crew member and category against what was billed.`}</div>
+      <div class="lead">${mode === "past" ? html`Events more than 30 days old (before ${fmtDate(cutoff)}).` : html`The last 30 days and everything upcoming. Open an event to see its charges by crew member against what was billed.`}</div>
     </div></div>
     <div class="card"><div class="row">
       <div class="search"><${Icon.search}/><input type="text" placeholder="Search by event name or city" value=${q} onInput=${(e) => setQ(e.target.value)}/></div>

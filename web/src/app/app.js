@@ -92,7 +92,7 @@ function App() {
       <span class="sp"></span>
       ${d && html`<span class="lastsync" title=${last?.message || ""}>Last sync ${fmtWhen(last?.finished_at || last?.started_at)}</span>`}
       ${d && html`<${SyncButton} user=${me} compact=${true} onDone=${changed}/>`}
-      <span class="who">${me?.email}<span class="role">${me?.is_editor ? "admin" : me?.is_member ? "can edit" : "view only"}</span><a onClick=${() => sb.auth.signOut()}>Sign out</a></span></div>
+      <span class="who">${me?.email}<span class="role">${me?.is_editor ? "Admin" : me?.is_member ? "Editor" : "Viewer"}</span><a onClick=${() => sb.auth.signOut()}>Sign out</a></span></div>
     <div class=${"wrap" + (tab === "expenses" && !opp ? " wide" : "")}>
       ${err && html`<div class="note red" style="margin-bottom:12px">Something went wrong loading data: ${err}</div>`}
       ${d ? html`<div>
@@ -102,7 +102,7 @@ function App() {
           : tab === "recon" ? html`<${Reconcile} d=${d} onOpen=${openEv}/>`
           : tab === "sync" ? html`<${SyncPage} d=${d} user=${me} onOpen=${openEv} onDone=${changed}/>`
           : html`<${EventList} d=${d} onOpen=${openEv} mode=${tab} cutoff=${cutoff}/>`}
-        <div class="foot">Ramp charges come in when anyone presses <b>Sync from Ramp</b> and automatically each morning at 5:30; Gusto and Capital One are added from screenshots. Salesforce syncs daily at 6am and on <b>Sync all</b>. ${!intro && html`<a onClick=${() => { showIntro(); go("expenses"); }}>Show "How this works"</a>`}</div>
+        <div class="foot">Ramp charges arrive each morning at 5:30 or on <b>Sync from Ramp</b>. Salesforce updates at 6am or on <b>Sync all</b>. ${!intro && html`<a onClick=${() => { showIntro(); go("expenses"); }}>How this works</a>`}</div>
       </div>` : html`<div class="mute">Loading data…</div>`}
     </div>
     ${toast && html`<div class="toast">${toast}</div>`}

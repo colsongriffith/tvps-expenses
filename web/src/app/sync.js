@@ -40,7 +40,7 @@ function SyncPage({ d, user, onOpen, onDone }) {
   };
   return html`<div>
     <div class="page-h"><div><h2>Salesforce sync</h2>
-      <div class="lead">Changes made here reach each crew member's staffing record in Salesforce once a day at 6am, or straight away with <b>Sync all</b>. Each sync adds or removes only what moved in this app, so spend Salesforce holds that this app can't see (Capital One, older hand entries) is left untouched.</div></div>
+      <div class="lead">Added charges reach each crew member's staffing record once a day at 6am, or now with <b>Sync all</b>. Only what moved here is written, so anything Salesforce holds that this app can't see is left alone.</div></div>
       <${SyncButton} user=${user} onDone=${onDone}/></div>
 
     ${last?.status === "not_connected" && html`<div class="note" style="margin-bottom:14px"><b>Salesforce is not connected yet.</b> Changes are queued below and will be written on the first sync after the connection is set up.</div>`}

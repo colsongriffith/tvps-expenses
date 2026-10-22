@@ -46,7 +46,7 @@ check(await row("Drip Drop Coffee").locator(".cf-why").count() === 0, "green row
 check(await row("Hilton Santa Fe").evaluate((e) => e.classList.contains("conf-low")) && await row("Hilton Santa Fe").locator(".cf-why").textContent().then((t) => t.includes("not who the rooms")), "red row shows why");
 check(await row("Doordash").evaluate((e) => e.classList.contains("conf-low")), "held with no stored confidence falls back to red");
 const stripe = await row("Drip Drop Coffee").locator("td").first().evaluate((e) => getComputedStyle(e).boxShadow);
-check(stripe.includes("21, 128, 61") && stripe.includes("7px"), "bold green stripe on the row edge (" + stripe + ")");
+check(stripe.includes("21, 128, 61") && stripe.includes("6px"), "bold green stripe on the row edge (" + stripe + ")");
 check(await page.locator(".cf-chip.high .n").textContent() === "1" && await page.locator(".cf-chip.low .n").textContent() === "2", "legend counts 1 green / 2 red");
 await page.locator(".cf-chip.low").click();
 check(JSON.stringify(await page.locator("table.xtab tr.xr .merch").allTextContents()) === JSON.stringify(["Hilton Santa Fe", "Doordash"]), "Verify chip filters to red rows");
@@ -56,7 +56,7 @@ check(await page.locator("table.xtab tr.xr").count() === 3, "clicking again clea
 // Gusto best guess: pre-filled, add in one click
 const gusto = row("Drip Drop Coffee");
 check(await gusto.locator(".src", { hasText: "Gusto" }).count() === 1, "Gusto source shown");
-check(await gusto.locator(".guess").textContent().then((t) => t.includes("Best guess")), "best guess label");
+check(await gusto.locator(".ev-in").inputValue().then((v) => v.includes("Roots")), "guessed event pre-filled in the event picker");
 check(await gusto.locator(".sp-btn").textContent().then((t) => t.includes("Kiki Dickie")), "guessed staff pre-ticked");
 // half-finished picks on another row must survive this save
 await row("Doordash").locator(".cat-c select").selectOption("hotels");
@@ -142,7 +142,7 @@ check(await page.locator(".sum.held .v").textContent() === "$655.60", "waiting-t
 await page.locator(".sum.held").click();
 await page.waitForSelector("text=Showing charges for");
 const sw = row("Southwest");
-check(await sw.locator(".guess").count() === 1 && await sw.locator(".sp-btn").textContent().then((t) => t.includes("Billy")), "removed charge back with its old placement as the guess");
+check(await sw.locator(".ev-in").inputValue().then((v) => v.includes("Roots")) && await sw.locator(".sp-btn").textContent().then((t) => t.includes("Billy")), "removed charge back with its old placement as the guess");
 check(await sw.locator("button", { hasText: "Add to event" }).count() === 1, "and can be re-added");
 check(await sw.evaluate((e) => e.classList.contains("conf-medium")) && await sw.locator(".cf-why").textContent().then((t) => t.includes("carried over")), "removed charge comes back orange");
 
