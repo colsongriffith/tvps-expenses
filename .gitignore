@@ -1,0 +1,8 @@
+node_modules/
+web/deploy/
+web/test/dist.js
+web/test/index.html
+web/test/*.png
+.env
+.env.*
+.DS_Store
