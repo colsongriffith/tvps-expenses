@@ -149,7 +149,7 @@ j = await (await call({ Authorization: "Bearer member" })).json();
 console.log(j.message);
 assert(j.status === "ok" && j.categorized === 6, "run ok, 6 categorized");
 assert(rampCalls.some((u) => u.includes("start=abc")), "followed Ramp page.next");
-assert(rampCalls.some((u) => u.includes("from_date=2026-09-21")), "window = last charge date (12 Oct) minus 21 days");
+assert(rampCalls.some((u) => u.includes("from_date=2026-08-13")), "window = last charge date (12 Oct) minus 60 days");
 assert(j.fetched === 7 && j.new_lines === 5, "7 usable charges (declined skipped), 5 new");
 const line = (ext: string) => T.expense_line.find((l) => l.external_id === ext)!;
 const active = (ext: string) => T.allocation_current.filter((a) => a.expense_line_id === line(ext).id && a.active);

@@ -5,7 +5,7 @@
 //   - pg_cron daily, with header x-cron-key (same key as sf-sync)
 //
 // Rules:
-//   - Re-pulls a rolling window (last charge date minus 21 days) so memo edits and pending→cleared changes are picked up.
+//   - Re-pulls a rolling window (last charge date minus 60 days) so memo edits and pending→cleared changes are picked up.
 //   - New charges land as `suggested` / `held` / high-confidence `overhead`. Nothing counts until someone presses Add.
 //   - A charge a person has already placed is never re-guessed. If its amount changes in Ramp it is reported, not moved.
 //   - Dates are the UTC date of the card transaction (the convention every run has used).
@@ -17,6 +17,7 @@ export const RAMP_SOURCE = "5941e287-68bc-4200-a793-73cc057133b5";
 const BATCH = 20;          // charges per Claude call
 const PARALLEL = 3;        // Claude calls at once
 const MAX_CATEGORIZE = 160; // per run; the rest are held and picked up next run
+const LOOKBACK_DAYS = 60;   // re-read this far back so late memos and amount changes are picked up
 const AUTO_BASES = ["claude", "ramp_sync_guess", "pending_claude", "intent:ambiguous", "no_memo"];
 
 const cors = {
@@ -83,7 +84,7 @@ export async function handler(req: Request, deps: { fetch?: typeof fetch; db?: S
     const { data: last } = await db.from("expense_line").select("txn_date").eq("source_id", RAMP_SOURCE)
       .not("txn_date", "is", null).order("txn_date", { ascending: false }).limit(1);
     const lastDate = last?.[0]?.txn_date ? new Date(last[0].txn_date + "T00:00:00Z") : new Date(Date.now() - 30 * 864e5);
-    from = new Date(lastDate.getTime() - 21 * 864e5).toISOString().slice(0, 10);
+    from = new Date(lastDate.getTime() - LOOKBACK_DAYS * 864e5).toISOString().slice(0, 10);
   }
   const { data: run, error: runErr } = await db.from("ramp_sync_run")
     .insert({ trigger, triggered_by: who, status: "running", from_date: from }).select("id").single();
