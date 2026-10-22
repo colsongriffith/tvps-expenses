@@ -46,7 +46,7 @@ check(await row("Drip Drop Coffee").locator(".cf-why").count() === 0, "green row
 check(await row("Hilton Santa Fe").evaluate((e) => e.classList.contains("conf-low")) && await row("Hilton Santa Fe").locator(".cf-why").textContent().then((t) => t.includes("not who the rooms")), "red row shows why");
 check(await row("Doordash").evaluate((e) => e.classList.contains("conf-low")), "held with no stored confidence falls back to red");
 const stripe = await row("Drip Drop Coffee").locator("td").first().evaluate((e) => getComputedStyle(e).boxShadow);
-check(stripe.includes("27, 127, 74"), "green stripe on the row edge (" + stripe + ")");
+check(stripe.includes("21, 128, 61") && stripe.includes("7px"), "bold green stripe on the row edge (" + stripe + ")");
 check(await page.locator(".cf-chip.high .n").textContent() === "1" && await page.locator(".cf-chip.low .n").textContent() === "2", "legend counts 1 green / 2 red");
 await page.locator(".cf-chip.low").click();
 check(JSON.stringify(await page.locator("table.xtab tr.xr .merch").allTextContents()) === JSON.stringify(["Hilton Santa Fe", "Doordash"]), "Verify chip filters to red rows");
