@@ -35,6 +35,12 @@ Owner: Colson Griffith (The Vanity Portrait Studio). Design history and run logs
 - `staffing_snapshot`: Salesforce staffing records (event × person). `person` maps Ramp user UUIDs and Salesforce contacts.
 - `ramp_sync_run`, `sf_sync_run`: run logs. `sf_sync_ledger` / `sf_field_state`: what the app has written and the hand-edit detector.
 
+## Things that bit us (keep in mind)
+- Supabase returns at most 1000 rows per request. `loadAll()` pages every big view with `.range()`; never read a view with a bare `select("*")`.
+- A data refresh re-renders every Expenses row; a row only resets its picks when its own saved placement changed (`lastSaved` ref). Don't "simplify" that.
+- Ramp amounts change after a charge is added (tips). ramp-sync keeps the person's placement and resizes the shares; the Salesforce sync then writes the delta.
+- Design: one family (system UI), one accent (`--brand` navy), light translucent top bar, sentence-case table headers, tabular figures on every number, confidence colors are deliberately loud (Colson's call).
+
 ## Rules that must not be broken
 - Never write Salesforce by hand. The sync does it, and it is a delta: it never lowers a field and never overwrites a hand edit (those are flagged).
 - A guess never counts until a person adds it. Never create `proposed` rows from automation.
