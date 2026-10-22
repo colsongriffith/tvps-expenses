@@ -53,8 +53,9 @@ Owner: Colson Griffith (The Vanity Portrait Studio). Design history and run logs
 
 ## Deploying
 - Front end:
-  - `cd web && npm ci && node build.mjs`, then deploy `web/deploy/` to the Vercel project `tvps-expenses`.
-  - Pushing to GitHub does NOT auto-deploy (the repo isn't git-linked in Vercel, and the project's saved build settings are empty).
-  - Deploy with Vercel `create_deployment` from `gitSource` (colsongriffith/tvps-expenses, ref main) and ALWAYS pass `projectSettings`: framework null, rootDirectory `web`, installCommand `npm ci`, buildCommand `node build.mjs`, outputDirectory `deploy`. Without them the site deploys as a 404 (happened 22 Oct for ~4 min).
-  - After deploying, fetch https://tvps-expenses.vercel.app/ and check it returns the app, not NOT_FOUND.
+  - Vercel is git-linked to colsongriffith/tvps-expenses (since 22 Oct 2026): every push to `main` deploys to production.
+  - Project settings (saved in Vercel): framework Other, root `web`, build `node build.mjs`, output `deploy`, install = default.
+  - Run `cd web && node build.mjs && node e2e.mjs` before pushing; it must end with `ERRORS: none`.
+  - After a push, fetch https://tvps-expenses.vercel.app/ and check it returns the app, not NOT_FOUND.
+  - If deploying by API instead, always pass `projectSettings` (rootDirectory `web`, buildCommand `node build.mjs`, outputDirectory `deploy`); without them the site deploys as a 404.
 - Functions: `supabase functions deploy ramp-sync --no-verify-jwt`, same for `sf-sync`. Both check auth themselves: a member JWT, or `x-cron-key` for pg_cron.
