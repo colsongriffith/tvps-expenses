@@ -49,7 +49,7 @@ Owner: Colson Griffith (The Vanity Portrait Studio). Design history and run logs
 ## Secrets (Supabase → Edge Functions → Secrets; never in code)
 - `RAMP_CLIENT_ID`, `RAMP_CLIENT_SECRET`: a Ramp Developer API app with Client Credentials and scopes `transactions:read users:read receipts:read`.
 - `ANTHROPIC_API_KEY`. `CLAUDE_MODEL` is optional (default `claude-sonnet-5-5`).
-- `SF_DOMAIN`, `SF_CLIENT_ID`, `SF_CLIENT_SECRET`: a Salesforce Connected App with the client-credentials flow (not yet set).
+- `SF_DOMAIN`, `SF_CLIENT_ID`, `SF_CLIENT_SECRET`: a Salesforce External Client App ("TVPS Expenses Sync") with the client-credentials flow, Run As Colson, IP relaxed. Set 22 Oct 2026; `SF_DOMAIN` = https://vanityportraitstudio.my.salesforce.com.
 
 ## Deploying
 - Front end:
