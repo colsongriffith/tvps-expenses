@@ -54,5 +54,7 @@ Owner: Colson Griffith (The Vanity Portrait Studio). Design history and run logs
 ## Deploying
 - Front end:
   - `cd web && npm ci && node build.mjs`, then deploy `web/deploy/` to the Vercel project `tvps-expenses`.
-  - The Vercel project settings are: root `web`, build `node build.mjs`, output `deploy`.
+  - Pushing to GitHub does NOT auto-deploy (the repo isn't git-linked in Vercel, and the project's saved build settings are empty).
+  - Deploy with Vercel `create_deployment` from `gitSource` (colsongriffith/tvps-expenses, ref main) and ALWAYS pass `projectSettings`: framework null, rootDirectory `web`, installCommand `npm ci`, buildCommand `node build.mjs`, outputDirectory `deploy`. Without them the site deploys as a 404 (happened 22 Oct for ~4 min).
+  - After deploying, fetch https://tvps-expenses.vercel.app/ and check it returns the app, not NOT_FOUND.
 - Functions: `supabase functions deploy ramp-sync --no-verify-jwt`, same for `sf-sync`. Both check auth themselves: a member JWT, or `x-cron-key` for pg_cron.
