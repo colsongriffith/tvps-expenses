@@ -1,14 +1,14 @@
 // In-memory stand-in for Supabase, mirroring what the database triggers do with overrides.
 const SYNC_FROM = "2026-09-07";
 const crew = [
-  { staffing_sf_id: "S1", opportunity_sf_id: "E1", contact_sf_id: "C_billy", full_name: "Billy Cole", role: "Photographer", event_date: "2026-10-10", is_ops_buyer: false, sf_total_cents: 65560, sf_mileage_cents: 0, fetched_at: "2026-10-13T21:00:00Z" },
-  { staffing_sf_id: "S2", opportunity_sf_id: "E1", contact_sf_id: "C_kiki", full_name: "Kiki Dickie", role: "Assistant", event_date: "2026-10-10", is_ops_buyer: false, sf_total_cents: 0, sf_mileage_cents: 0, fetched_at: "2026-10-13T21:00:00Z" },
-  { staffing_sf_id: "S3", opportunity_sf_id: "E1", contact_sf_id: "C_steph", full_name: "Stephanie Walker", role: "Print Manager", event_date: "2026-10-10", is_ops_buyer: false, sf_total_cents: 0, sf_mileage_cents: 0, fetched_at: "2026-10-13T21:00:00Z" },
-  { staffing_sf_id: "S4", opportunity_sf_id: "E2", contact_sf_id: "C_steph", full_name: "Stephanie Walker", role: "Photographer", event_date: "2026-10-08", is_ops_buyer: false, sf_total_cents: 4200, sf_mileage_cents: 0, fetched_at: "2026-10-13T21:00:00Z" },
-  { staffing_sf_id: "S6", opportunity_sf_id: "E4", contact_sf_id: "C_billy", full_name: "Billy Cole", role: "Photographer", event_date: "2026-09-30", is_ops_buyer: false, sf_total_cents: 0, sf_mileage_cents: 0, fetched_at: "2026-10-13T21:00:00Z" },
-  { staffing_sf_id: "S5", opportunity_sf_id: "E3", contact_sf_id: "C_billy", full_name: "Billy Cole", role: "Photographer", event_date: "2026-05-01", is_ops_buyer: false, sf_total_cents: 10000, sf_mileage_cents: 0, fetched_at: "2026-10-13T21:00:00Z" },
+  { staffing_sf_id: "S1", opportunity_sf_id: "E1", contact_sf_id: "C_billy", full_name: "Avery Example", role: "Photographer", event_date: "2026-10-10", is_ops_buyer: false, sf_total_cents: 65560, sf_mileage_cents: 0, fetched_at: "2026-10-13T21:00:00Z" },
+  { staffing_sf_id: "S2", opportunity_sf_id: "E1", contact_sf_id: "C_kiki", full_name: "Casey Fixture", role: "Assistant", event_date: "2026-10-10", is_ops_buyer: false, sf_total_cents: 0, sf_mileage_cents: 0, fetched_at: "2026-10-13T21:00:00Z" },
+  { staffing_sf_id: "S3", opportunity_sf_id: "E1", contact_sf_id: "C_steph", full_name: "Blake Sample", role: "Print Manager", event_date: "2026-10-10", is_ops_buyer: false, sf_total_cents: 0, sf_mileage_cents: 0, fetched_at: "2026-10-13T21:00:00Z" },
+  { staffing_sf_id: "S4", opportunity_sf_id: "E2", contact_sf_id: "C_steph", full_name: "Blake Sample", role: "Photographer", event_date: "2026-10-08", is_ops_buyer: false, sf_total_cents: 4200, sf_mileage_cents: 0, fetched_at: "2026-10-13T21:00:00Z" },
+  { staffing_sf_id: "S6", opportunity_sf_id: "E4", contact_sf_id: "C_billy", full_name: "Avery Example", role: "Photographer", event_date: "2026-09-30", is_ops_buyer: false, sf_total_cents: 0, sf_mileage_cents: 0, fetched_at: "2026-10-13T21:00:00Z" },
+  { staffing_sf_id: "S5", opportunity_sf_id: "E3", contact_sf_id: "C_billy", full_name: "Avery Example", role: "Photographer", event_date: "2026-05-01", is_ops_buyer: false, sf_total_cents: 10000, sf_mileage_cents: 0, fetched_at: "2026-10-13T21:00:00Z" },
 ];
-const people = { C_billy: "Billy Cole", C_kiki: "Kiki Dickie", C_steph: "Stephanie Walker", C_japhy: "Japhy Altenhein" };
+const people = { C_billy: "Avery Example", C_kiki: "Casey Fixture", C_steph: "Blake Sample", C_japhy: "Japhy Example" };
 const baseEvents = [
   { opportunity_sf_id: "E1", opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", event_date: "2026-10-10", venue_city: "Santa Fe", venue_state: "NM", stage: "Photos Delivered", staffing_records: 3, billed_travel_fee_cents: 25000,
     billed: { flights: 100000, hotels: 50000, transportation: 20000, per_diem: 30000 } },
@@ -22,13 +22,13 @@ const mk = (o) => ({
   payer_is_ops_buyer: false, in_salesforce: false, memo: "", fine_category: null, ...o,
 });
 const lineInfo = {
-  L1: { expense_line_id: "L1", line_cents: 65560, charge_date: "2026-05-29", merchant_name: "Southwest", memo: "Flight for William Cr Cole OAK-ABQ-OAK", payer_contact_sf_id: "C_japhy", payer_full_name: "Japhy Altenhein", payer_is_ops_buyer: true, fine_category: "flights" },
-  L2: { expense_line_id: "L2", line_cents: 31915, charge_date: "2026-10-09", merchant_name: "Hilton Santa Fe", memo: "Hotel for Roots crew", payer_contact_sf_id: "C_japhy", payer_full_name: "Japhy Altenhein", payer_is_ops_buyer: true, fine_category: "hotels" },
-  L3: { expense_line_id: "L3", line_cents: 2345, charge_date: "2026-10-10", merchant_name: "Chipotle", memo: "Lunch Roots", payer_contact_sf_id: "C_steph", payer_full_name: "Stephanie Walker", clear_state: "pending", fine_category: "meals" },
-  L4: { expense_line_id: "L4", line_cents: 4000, charge_date: "2026-10-10", merchant_name: "Uber", memo: "Airport to hotel", payer_contact_sf_id: "C_kiki", payer_full_name: "Kiki Dickie", fine_category: "rideshare" },
-  L5: { expense_line_id: "L5", line_cents: 6866, charge_date: "2026-09-28", merchant_name: "Doordash", memo: "", payer_contact_sf_id: "C_billy", payer_full_name: "Billy Cole", fine_category: "meals" },
-  L7: { expense_line_id: "L7", line_cents: 2070, charge_date: "2026-10-11", merchant_name: "Drip Drop Coffee", memo: "Breakfast Day 2 Roots", payer_contact_sf_id: "C_kiki", payer_full_name: "Kiki Dickie", fine_category: "per_diem", source: "Gusto" },
-  L6: { expense_line_id: "L6", line_cents: 10000, charge_date: "2026-04-30", merchant_name: "Costco", memo: "Snacks", payer_contact_sf_id: "C_billy", payer_full_name: "Billy Cole", fine_category: "groceries" },
+  L1: { expense_line_id: "L1", line_cents: 65560, charge_date: "2026-05-29", merchant_name: "Southwest", memo: "Flight for Avery Cr Example OAK-ABQ-OAK", payer_contact_sf_id: "C_japhy", payer_full_name: "Japhy Example", payer_is_ops_buyer: true, fine_category: "flights" },
+  L2: { expense_line_id: "L2", line_cents: 31915, charge_date: "2026-10-09", merchant_name: "Hilton Santa Fe", memo: "Hotel for Roots crew", payer_contact_sf_id: "C_japhy", payer_full_name: "Japhy Example", payer_is_ops_buyer: true, fine_category: "hotels" },
+  L3: { expense_line_id: "L3", line_cents: 2345, charge_date: "2026-10-10", merchant_name: "Chipotle", memo: "Lunch Roots", payer_contact_sf_id: "C_steph", payer_full_name: "Blake Sample", clear_state: "pending", fine_category: "meals" },
+  L4: { expense_line_id: "L4", line_cents: 4000, charge_date: "2026-10-10", merchant_name: "Uber", memo: "Airport to hotel", payer_contact_sf_id: "C_kiki", payer_full_name: "Casey Fixture", fine_category: "rideshare" },
+  L5: { expense_line_id: "L5", line_cents: 6866, charge_date: "2026-09-28", merchant_name: "Doordash", memo: "", payer_contact_sf_id: "C_billy", payer_full_name: "Avery Example", fine_category: "meals" },
+  L7: { expense_line_id: "L7", line_cents: 2070, charge_date: "2026-10-11", merchant_name: "Drip Drop Coffee", memo: "Breakfast Day 2 Roots", payer_contact_sf_id: "C_kiki", payer_full_name: "Casey Fixture", fine_category: "per_diem", source: "Gusto" },
+  L6: { expense_line_id: "L6", line_cents: 10000, charge_date: "2026-04-30", merchant_name: "Costco", memo: "Snacks", payer_contact_sf_id: "C_billy", payer_full_name: "Avery Example", fine_category: "groceries" },
 };
 let rows = [
   mk({ ...lineInfo.L1, opportunity_sf_id: "E1", staffing_sf_id: "S1", sf_category: "flights", status: "written", in_salesforce: true }),
@@ -40,7 +40,7 @@ let rows = [
   mk({ ...lineInfo.L6, opportunity_sf_id: "E3", staffing_sf_id: "S5", sf_category: "other", status: "historical" }),
 ];
 const ledger = { "S1|flights": 65560 };
-let flags = [{ id: "F1", staffing_sf_id: "S4", opportunity_sf_id: "E2", sf_category: "transportation", kind: "hand_edit", sf_value_cents: 5000, expected_cents: 4200, delta_cents: 0, opportunity_name: "Edward's 50th Birthday Bash", event_date: "2026-10-08", full_name: "Stephanie Walker" }];
+let flags = [{ id: "F1", staffing_sf_id: "S4", opportunity_sf_id: "E2", sf_category: "transportation", kind: "hand_edit", sf_value_cents: 5000, expected_cents: 4200, delta_cents: 0, opportunity_name: "Edward's 50th Birthday Bash", event_date: "2026-10-08", full_name: "Blake Sample" }];
 let rampRuns = [{ id: "RR1", trigger: "daily", triggered_by: "schedule", status: "ok", started_at: "2026-10-21T12:37:00Z", finished_at: "2026-10-21T12:38:10Z", message: "Pulled 3 charges." }];
 const runs = [{ id: "R1", trigger: "daily", started_at: "2026-10-20T13:07:00Z", finished_at: "2026-10-20T13:07:05Z", status: "nothing_to_do", fields_written: 0, net_cents: 0, message: "Salesforce is already up to date." }];
 window.__overrides = [];
@@ -125,7 +125,7 @@ class Q {
   }
 }
 export function createClient() {
-  const session = { access_token: "tok", user: { id: "u-colson", email: "colson@thevanityportraitstudio.com" } };
+  const session = { access_token: "tok", user: { id: "u-admin", email: "test-admin@example.com" } };
   return {
     auth: {
       getSession: async () => ({ data: { session } }),
@@ -136,7 +136,7 @@ export function createClient() {
     rpc: async (name, args) => {
       if (name === "app_me") {
         const member = /[?&]as=member/.test(location.search);
-        return { data: [{ email: member ? "kiki@thevanityportraitstudio.com" : "colson@thevanityportraitstudio.com", is_member: true, is_editor: !member, role: member ? "viewer" : "admin" }], error: null };
+        return { data: [{ email: member ? "test-staff@example.com" : "test-admin@example.com", is_member: true, is_editor: !member, role: member ? "viewer" : "admin" }], error: null };
       }
       if (name === "sf_sync_flag_accept") { flags = flags.filter((f) => f.id !== args.p_flag); return { data: null, error: null }; }
       return { data: null, error: { message: "unknown rpc " + name } };
@@ -146,7 +146,7 @@ export function createClient() {
 
 // e2e helper: what the ramp-sync function would do (a new charge with Claude's guess, plus a run row)
 window.__mockRampSync = (who) => {
-  lineInfo.L8 = { expense_line_id: "L8", line_cents: 4210, charge_date: "2026-10-12", merchant_name: "Blue Bottle", memo: "Per diem Roots day 2", payer_contact_sf_id: "C_steph", payer_full_name: "Stephanie Walker", fine_category: "meals" };
-  rows.push(mk({ ...lineInfo.L8, opportunity_sf_id: "E1", staffing_sf_id: "S3", sf_category: "per_diem", status: "suggested", basis: "claude:claude-sonnet-5-5", confidence: "high", confidence_reason: "Memo says per diem for Roots; Stephanie is on the crew.", allocated_cents: 4210 }));
+  lineInfo.L8 = { expense_line_id: "L8", line_cents: 4210, charge_date: "2026-10-12", merchant_name: "Blue Bottle", memo: "Per diem Roots day 2", payer_contact_sf_id: "C_steph", payer_full_name: "Blake Sample", fine_category: "meals" };
+  rows.push(mk({ ...lineInfo.L8, opportunity_sf_id: "E1", staffing_sf_id: "S3", sf_category: "per_diem", status: "suggested", basis: "claude:claude-sonnet-5-5", confidence: "high", confidence_reason: "Memo says per diem for Roots; Blake is on the crew.", allocated_cents: 4210 }));
   rampRuns = [{ id: "RR2", trigger: "button", triggered_by: who, status: "ok", started_at: new Date().toISOString(), finished_at: new Date().toISOString(), message: "Pulled 1 new charge." }, ...rampRuns];
 };

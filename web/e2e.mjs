@@ -25,7 +25,7 @@ page.on("pageerror", (e) => errors.push("pageerror: " + e.message));
 page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text()); });
 page.on("dialog", (d) => d.accept());
 let rampCalls = 0;
-await page.route("**/functions/v1/ramp-sync", async (r) => { rampCalls++; await page.evaluate(() => window.__mockRampSync("colson@thevanityportraitstudio.com")); return r.fulfill({ json: { status: "ok", message: "Pulled 4 charges from Ramp since 2026-09-21. 1 new. Claude pre-filled 1: 1 green, 0 orange, 0 red." } }); });
+await page.route("**/functions/v1/ramp-sync", async (r) => { rampCalls++; await page.evaluate(() => window.__mockRampSync("test-admin@example.com")); return r.fulfill({ json: { status: "ok", message: "Pulled 4 charges from Ramp since 2026-09-21. 1 new. Claude pre-filled 1: 1 green, 0 orange, 0 red." } }); });
 await page.route("**/functions/v1/sf-sync", (r) => r.fulfill({ json: { status: "not_connected", message: "Salesforce is not connected yet." } }));
 const last = () => page.evaluate(() => window.__overrides.at(-1));
 const row = (t) => page.locator("table.xtab tr.xr", { hasText: t });
@@ -57,7 +57,7 @@ check(await page.locator("table.xtab tr.xr").count() === 3, "clicking again clea
 const gusto = row("Drip Drop Coffee");
 check(await gusto.locator(".src", { hasText: "Gusto" }).count() === 1, "Gusto source shown");
 check(await gusto.locator(".ev-in").inputValue().then((v) => v.includes("Roots")), "guessed event pre-filled in the event picker");
-check(await gusto.locator(".sp-btn").textContent().then((t) => t.includes("Kiki Dickie")), "guessed staff pre-ticked");
+check(await gusto.locator(".sp-btn").textContent().then((t) => t.includes("Casey Fixture")), "guessed staff pre-ticked");
 // half-finished picks on another row must survive this save
 await row("Doordash").locator(".cat-c select").selectOption("hotels");
 await gusto.locator("button", { hasText: "Add to event" }).click();
@@ -65,7 +65,7 @@ await page.waitForSelector(".toast >> text=Added to the event.");
 check(await row("Doordash").locator(".cat-c select").inputValue() === "hotels", "picks on another row survive a save elsewhere");
 await row("Doordash").locator(".cat-c select").selectOption("per_diem");
 let o = await last();
-check(o.action === "reassign" && o.staffing_sf_id === "S2" && o.sf_category === "per_diem", "Add sends reassign to Kiki / Per Diem");
+check(o.action === "reassign" && o.staffing_sf_id === "S2" && o.sf_category === "per_diem", "Add sends reassign to Casey / Per Diem");
 check(await row("Drip Drop Coffee").count() === 0, "added charge leaves Not added");
 
 // Japhy hotel: event known, no staff -> button disabled, Japhy's card chip
@@ -75,17 +75,17 @@ const hilOpts = await evOpts(hil); await closeEv(hil);
 check(hilOpts.length === 2 && !hilOpts.some((t) => t.includes("Old Spring")) && !hilOpts.some((t) => t.includes("Lost")), "Japhy's card: upcoming or last-30-day events only (got " + hilOpts.join(" | ") + ")");
 check(await hil.locator("button", { hasText: "Tick staff to add" }).isDisabled(), "cannot add without staff");
 await hil.locator(".sp-btn").click();
-await hil.locator(".sp-opt", { hasText: "Billy Cole" }).locator("input").check();
-await hil.locator(".sp-opt", { hasText: "Stephanie Walker" }).locator("input").check();
+await hil.locator(".sp-opt", { hasText: "Avery Example" }).locator("input").check();
+await hil.locator(".sp-opt", { hasText: "Blake Sample" }).locator("input").check();
 check(await hil.locator(".sp-pop").textContent().then((t) => t.includes("Split evenly 2 ways")), "split hint");
 await hil.locator(".sp-pop button", { hasText: "Done" }).click();
 check(await hil.locator(".cat-c select").inputValue() === "hotels", "category guessed from Ramp (hotels)");
 await hil.locator("button", { hasText: "Add to event" }).click();
 await page.waitForSelector(".toast >> text=Added to the event.");
 o = await last();
-check(o.action === "split" && o.split_staffing_ids.join() === "S1,S3" && o.sf_category === "hotels", "split across Billy + Stephanie");
+check(o.action === "split" && o.split_staffing_ids.join() === "S1,S3" && o.sf_category === "hotels", "split across Avery + Blake");
 
-// Doordash: no event. choose event -> payer preticked (Billy on crew)
+// Doordash: no event. choose event -> payer preticked (Avery on crew)
 const dd = row("Doordash");
 check(await dd.locator("button", { hasText: "Choose an event" }).isDisabled(), "no event -> disabled");
 const ddOpts = await evOpts(dd);
@@ -105,7 +105,7 @@ check((await dd.locator(".ev-pop .ev-opt").allTextContents()).some((t) => t.incl
 await dd.locator(".ev-in").fill("roots");
 await dd.locator(".ev-in").press("Enter");
 check(await dd.locator(".ev-in").inputValue().then((v) => v.includes("Roots")), "Enter picks the highlighted event");
-check(await dd.locator(".sp-btn").textContent().then((t) => t.includes("Billy Cole")), "payer pre-ticked when on the crew");
+check(await dd.locator(".sp-btn").textContent().then((t) => t.includes("Avery Example")), "payer pre-ticked when on the crew");
 check(!(await dd.evaluate((e) => e.className.includes("conf-"))), "colour clears once someone changes the dropdowns");
 await dd.locator(".ev-in").click();
 await dd.locator(".ev-in").fill("overh");
@@ -142,7 +142,7 @@ check(await page.locator(".sum.held .v").textContent() === "$655.60", "waiting-t
 await page.locator(".sum.held").click();
 await page.waitForSelector("text=Showing charges for");
 const sw = row("Southwest");
-check(await sw.locator(".ev-in").inputValue().then((v) => v.includes("Roots")) && await sw.locator(".sp-btn").textContent().then((t) => t.includes("Billy")), "removed charge back with its old placement as the guess");
+check(await sw.locator(".ev-in").inputValue().then((v) => v.includes("Roots")) && await sw.locator(".sp-btn").textContent().then((t) => t.includes("Avery")), "removed charge back with its old placement as the guess");
 check(await sw.locator("button", { hasText: "Add to event" }).count() === 1, "and can be re-added");
 check(await sw.evaluate((e) => e.classList.contains("conf-medium")) && await sw.locator(".cf-why").textContent().then((t) => t.includes("carried over")), "removed charge comes back orange");
 
@@ -156,7 +156,7 @@ await page.waitForSelector(".toast >> text=Claude pre-filled 1");
 check(rampCalls === 1, "Sync from Ramp calls the ramp-sync function once");
 const bb = row("Blue Bottle");
 check(await bb.count() === 1 && await bb.evaluate((e) => e.classList.contains("conf-high")), "new charge appears in Not added with Claude's green guess");
-check(await page.locator(".ramp-sync .xs").textContent().then((t) => t.includes("by colson")), "last-pulled line shows who pressed it");
+check(await page.locator(".ramp-sync .xs").textContent().then((t) => t.includes("by test-admin")), "last-pulled line shows who pressed it");
 
 // phone width
 await page.setViewportSize({ width: 390, height: 844 });
