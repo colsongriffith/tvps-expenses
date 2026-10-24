@@ -34,7 +34,7 @@ fs.writeFileSync(OUT + "/index.html", `<!doctype html><html lang="en"><head><met
 fs.writeFileSync(OUT + "/vercel.json", JSON.stringify({
   cleanUrls: true,
   headers: [
-    { source: "/(.*)", headers: [{ key: "X-Frame-Options", value: "DENY" }, { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" }] },
+    { source: "/(.*)", headers: [{ key: "X-Frame-Options", value: "DENY" }, { key: "X-Content-Type-Options", value: "nosniff" }, { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" }] },
     { source: "/app/(.*)", headers: [{ key: "Cache-Control", value: "public, max-age=0, must-revalidate" }] },
   ],
 }));

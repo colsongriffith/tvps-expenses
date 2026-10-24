@@ -35,7 +35,7 @@ globalThis.fetch = (async (input: Request | URL | string, init?: RequestInit) =>
   if (url.includes("/rest/v1/sf_sync_run") && method === "GET") return ok([]);
   if (url.includes("/rest/v1/sf_sync_run") && method === "POST") return ok({ id: "run-1" });
   if (url.includes("/rest/v1/sf_sync_run")) return ok([]);
-  if (url.includes("/rpc/app_me")) return ok([{ email: "colson@thevanityportraitstudio.com", is_editor: true }]);
+  if (url.includes("/rpc/app_me")) return ok([{ email: "test-admin@example.com", is_editor: true }]);
   if (url.includes("/rpc/sf_sync_plan")) return ok(PLAN);
   if (url.includes("/rpc/sf_sync_finish")) { finishPayload = JSON.parse(body!); return ok(null); }
   if (url.includes("/oauth2/token")) return ok({ access_token: "tok", instance_url: "https://sf.test" });
