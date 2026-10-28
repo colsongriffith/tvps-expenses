@@ -178,6 +178,18 @@ await page.waitForFunction(() => window.__ignores.length === 2);
 await page.waitForTimeout(300);
 check(await page.evaluate(() => window.__ignores[1].ignored === false), "Undo writes ignored=false");
 check(await tsRows().count() === 2, "Undo puts the line back");
+const sfCard = page.locator(".sec-h:has(h3:has-text('Salesforce fixes for Japhy')) + .card");
+check(await tsRows().filter({ hasText: "Stephanie Walker" }).count() === 0, "travel-compensation lines are not in Timesheet not entered properly");
+const sfRow = sfCard.locator("tbody tr");
+check(await sfRow.count() === 1 && await sfRow.textContent().then((t) => t.includes("Stephanie Walker") && t.includes("1.0 h Admin/Commuting") && t.includes("8.0 h Print Manager / Editor")), "Salesforce fixes for Japhy lists the event with the crew's Gusto entries by job");
+await sfRow.locator("input[type=checkbox]").check();
+await sfCard.locator("button", { hasText: "Draft email to Japhy" }).click();
+await page.waitForFunction(() => window.__emailReqs.length === 1);
+check(await page.evaluate(() => window.__emailReqs[0].audience === "admin" && window.__emailReqs[0].issue_key === "travel_comp_undetermined:S3"), "Draft email to Japhy queues the admin request");
+await sfRow.locator("button", { hasText: "Ignore" }).click();
+await page.waitForFunction(() => window.__ignores.length === 3);
+await page.waitForTimeout(300);
+check(await sfCard.locator("tbody tr").count() === 0, "Ignore removes the Salesforce fix row");
 await page.locator(".top .seg button", { hasText: "Expenses" }).click();
 await page.waitForSelector("h2:has-text('Expenses')");
 

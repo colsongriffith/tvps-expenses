@@ -106,20 +106,19 @@ const TS_REASON = {
 };
 const tz = (t) => t ? new Date(t).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" }) : "";
 
-// Timesheet not entered properly: one row per person and event, each problem on its own line with a tick box.
-// Ticked lines become email requests; Claude drafts them in Colson's Gmail (one email per person per event,
-// and one to Japhy for venues missing travel compensation). Nothing is sent automatically.
 // A Gusto job is required on every entry. Older loads stored the rate but not the title; the only $25/hr job is Admin/Commuting.
 const jobOf = (s) => s.gusto_role_title || (Number(s.rate_cents) === 2500 ? "Admin/Commuting" : s.rate_cents ? `${$(s.rate_cents)}/hr job` : "—");
 
-function Timesheets({ issues, shifts, user, onChanged, onOpenEvent }) {
-  // Record-level problems (commute missing, travel compensation not set…) aren't about one entry, so show every entry that day.
-  const shiftsOf = useMemo(() => {
-    const m = {};
-    for (const x of shifts || []) if (x.staffing_sf_id) (m[x.staffing_sf_id] ||= []).push(x);
-    for (const k in m) m[k].sort((a, b) => (a.clock_in || "").localeCompare(b.clock_in || ""));
-    return m;
-  }, [shifts]);
+const workedH = (x) => Math.round((Number(x.minutes || 0) - Number(x.break_minutes || 0)) / 6) / 10;
+const useShiftsOf = (shifts) => useMemo(() => {
+  const m = {};
+  for (const x of shifts || []) if (x.staffing_sf_id) (m[x.staffing_sf_id] ||= []).push(x);
+  for (const k in m) m[k].sort((a, b) => (a.clock_in || "").localeCompare(b.clock_in || ""));
+  return m;
+}, [shifts]);
+
+// Shared by both problem lists: email requests (Claude drafts them in Gmail) and Ignore / Undo.
+function useIssueActions(issues, user, onChanged) {
   const [sel, setSel] = useState({});
   const [reqs, setReqs] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -134,22 +133,17 @@ function Timesheets({ issues, shifts, user, onChanged, onOpenEvent }) {
   const reqOf = {};
   for (const r of reqs) if (!reqOf[r.issue_key]) reqOf[r.issue_key] = r;
   const shown = issues.filter((i) => !gone[i.issue_key]);
-  const groups = {};
-  for (const i of shown) (groups[i.staffing_sf_id] ||= { ...i, lines: [] }).lines.push(i);
-  const rows = Object.values(groups).sort((a, b) => (b.event_date || "").localeCompare(a.event_date || "") || (a.person_name || "").localeCompare(b.person_name || ""));
   const picked = shown.filter((i) => sel[i.issue_key] && !reqOf[i.issue_key]);
-  const edit = canEdit(user);
-  const canIgnore = !!user?.is_editor;
-  const who = (i) => `${i.person_name || "(unknown)"}: ${(TS_REASON[i.reason] || { label: i.reason }).label}`;
-  // Ignore = the time was checked and is right. The line leaves the list (and stops holding back the sync tick).
-  const ignore = async (i, ignored = true) => {
-    setErr(""); setGone({ ...gone, [i.issue_key]: ignored });
-    if (ignored) { const { [i.issue_key]: _, ...rest } = sel; setSel(rest); }
+  const mark = (list, v) => Object.fromEntries(list.map((i) => [i.issue_key, v]));
+  // Ignore = checked and correct. The lines leave the list (and stop holding back the sync tick).
+  const ignore = async (list, label, ignored = true) => {
+    setErr(""); setGone((g) => ({ ...g, ...mark(list, ignored) }));
+    if (ignored) setSel((s) => { const n = { ...s }; for (const i of list) delete n[i.issue_key]; return n; });
     try {
-      await ignoreTimesheetIssues(user, [i], ignored);
-      setUndo(ignored ? i : null);
-      await onChanged(ignored ? `Ignored ${who(i)}. Marked as approved and entered properly.` : `Put back ${who(i)}.`);
-    } catch (e) { setGone({ ...gone, [i.issue_key]: !ignored }); setErr("Could not save: " + (e.message || e)); }
+      await ignoreTimesheetIssues(user, list, ignored);
+      setUndo(ignored ? { list, label } : null);
+      await onChanged(ignored ? `Ignored ${label}.` : `Put back ${label}.`);
+    } catch (e) { setGone((g) => ({ ...g, ...mark(list, !ignored) })); setErr("Could not save: " + (e.message || e)); }
   };
   const draft = async () => {
     setBusy(true); setErr("");
@@ -162,25 +156,40 @@ function Timesheets({ issues, shifts, user, onChanged, onOpenEvent }) {
     } catch (e) { setErr(e.message || String(e)); }
     finally { setBusy(false); }
   };
-  const status = (i) => {
-    const r = reqOf[i.issue_key];
+  const status = (list) => {
+    const r = list.map((i) => reqOf[i.issue_key]).find(Boolean);
     if (!r) return "";
     return r.status === "drafted" ? html`<span class="badge ok" style="margin-left:6px">Draft in Gmail</span>` : html`<span class="badge info" style="margin-left:6px">Email queued</span>`;
   };
+  const undoBar = undo && html`<div class="ts-undo" style="padding:10px 14px;border-top:1px solid var(--line-2);display:flex;gap:10px;align-items:center">
+    <span class="sm">Ignored ${undo.label}.</span><button class="btn sec small" onClick=${() => ignore(undo.list, undo.label, false)}>Undo</button></div>`;
+  return { sel, setSel, busy, err, reqOf, shown, picked, ignore, draft, status, undoBar };
+}
+
+// Timesheet not entered properly: problems the employee fixes in Gusto. One row per person and event,
+// each problem on its own line. Ticked lines become email drafts in Colson's Gmail; nothing is sent automatically.
+function Timesheets({ issues, shifts, user, onChanged, onOpenEvent }) {
+  const shiftsOf = useShiftsOf(shifts);
+  const a = useIssueActions(issues, user, onChanged);
+  const groups = {};
+  for (const i of a.shown) (groups[i.staffing_sf_id] ||= { ...i, lines: [] }).lines.push(i);
+  const rows = Object.values(groups).sort((x, y) => (y.event_date || "").localeCompare(x.event_date || "") || (x.person_name || "").localeCompare(y.person_name || ""));
+  const edit = canEdit(user);
+  const canIgnore = !!user?.is_editor;
+  const who = (i) => `${i.person_name || "(unknown)"}: ${(TS_REASON[i.reason] || { label: i.reason }).label}`;
   const line = (i) => {
     const r = TS_REASON[i.reason] || { label: i.reason, cls: "grey" };
-    const done = !!reqOf[i.issue_key];
+    const done = !!a.reqOf[i.issue_key];
+    const day = !i.wage_shift_id ? shiftsOf[i.staffing_sf_id] || [] : [];
     return html`<div style="display:flex;gap:8px;align-items:flex-start">
-      ${edit ? html`<input type="checkbox" style="margin-top:3px" disabled=${done} checked=${done || !!sel[i.issue_key]} title=${done ? "Email already requested" : "Tick to include in the next Gmail draft"}
-        onChange=${(e) => setSel({ ...sel, [i.issue_key]: e.target.checked })}/>` : ""}
-      <div><span class="badge ${r.cls}" title=${r.why || ""}>${r.label}</span>${status(i)}
+      ${edit ? html`<input type="checkbox" style="margin-top:3px" disabled=${done} checked=${done || !!a.sel[i.issue_key]} title=${done ? "Email already requested" : "Tick to include in the next Gmail draft"}
+        onChange=${(e) => a.setSel({ ...a.sel, [i.issue_key]: e.target.checked })}/>` : ""}
+      <div><span class="badge ${r.cls}" title=${r.why || ""}>${r.label}</span>${a.status([i])}
       <div class="xs mute">${i.clock_in ? `${fmtDate(i.work_date)} ${tz(i.clock_in)}–${tz(i.clock_out)} · ${hrs(i.hours)}` : ""}
       ${i.entered_rate_cents != null && i.expected_rate_cents != null && i.entered_rate_cents !== i.expected_rate_cents ? ` · entered ${$(i.entered_rate_cents)}/hr, should be ${$(i.expected_rate_cents)}/hr` : ""}
-      ${i.reason === "missing_commute" && i.commute_minutes ? ` · ${i.commute_minutes} min each way expected` : ""}
-      ${i.audience === "admin" ? " · email goes to Japhy" : ""}</div>
-      ${i.reason === "travel_comp_undetermined" ? html`<div class="xs" style="margin-top:2px">Nothing for ${(i.person_name || "them").split(" ")[0]} to fix: the Venue in Salesforce needs travel compensation set, so the app can tell whether their commute is paid.</div>` : ""}
-      ${!i.wage_shift_id && (shiftsOf[i.staffing_sf_id] || []).length ? html`<div class="xs" style="margin-top:4px">${shiftsOf[i.staffing_sf_id].map((x) => html`<div key=${x.wage_shift_id}>
-        ${fmtDate(x.work_date)} ${tz(x.clock_in)}–${tz(x.clock_out)} · ${hrs(Math.round((Number(x.minutes || 0) - Number(x.break_minutes || 0)) / 6) / 10)} · ${jobOf(x)}</div>`)}</div>` : ""}</div></div>`;
+      ${i.reason === "missing_commute" && i.commute_minutes ? ` · ${i.commute_minutes} min each way expected` : ""}</div>
+      ${day.length ? html`<div class="xs" style="margin-top:4px">${day.map((x) => html`<div key=${x.wage_shift_id}>
+        ${fmtDate(x.work_date)} ${tz(x.clock_in)}–${tz(x.clock_out)} · ${hrs(workedH(x))} · ${jobOf(x)}</div>`)}</div>` : ""}</div></div>`;
   };
   // Gusto job column: the entry's job, or every job used that day for record-level problems.
   const jobCell = (i) => {
@@ -189,25 +198,73 @@ function Timesheets({ issues, shifts, user, onChanged, onOpenEvent }) {
     return jobs.length ? jobs.join(", ") : null;
   };
   return html`<div>
-    <div class="sec-h"><h3>Timesheet not entered properly</h3><span class="mute">Fix these before payroll. Hover a reason to see why it was flagged. Tick the ones that need an email, then press Draft emails in Gmail. Press Ignore on a line once you've confirmed the time was approved and entered properly.</span></div>
-    ${err && html`<div class="note red" style="margin-bottom:10px">${err}</div>`}
+    <div class="sec-h"><h3>Timesheet not entered properly</h3><span class="mute">Fix these in Gusto before payroll. Hover a reason to see why it was flagged. Tick the ones that need an email, then press Draft emails in Gmail. Press Ignore on a line once you've confirmed the time was approved and entered properly.</span></div>
+    ${a.err && html`<div class="note red" style="margin-bottom:10px">${a.err}</div>`}
     <div class="card flush">${rows.length ? html`<table key="t">
       <thead><tr><th>Person</th><th>Event</th><th>What's wrong</th><th>Gusto job</th><th>Memo in Gusto</th>${canIgnore ? html`<th></th>` : ""}</tr></thead>
-      <tbody>${rows.flatMap((g) => g.lines.sort((a, b) => (a.clock_in || "").localeCompare(b.clock_in || "")).map((i, n) => html`<tr key=${i.issue_key}>
+      <tbody>${rows.flatMap((g) => g.lines.sort((x, y) => (x.clock_in || "").localeCompare(y.clock_in || "")).map((i, n) => html`<tr key=${i.issue_key}>
         ${n === 0 ? html`<td key="p" rowSpan=${g.lines.length} style="vertical-align:top"><div class="b">${g.person_name || "(unknown)"}</div><div class="xs mute">${g.email || ""}</div></td>
         <td key="e" rowSpan=${g.lines.length} class="sm" style="vertical-align:top"><a onClick=${() => onOpenEvent(g.opportunity_sf_id)}>${g.opportunity_name}</a><div class="xs mute">${fmtDate(g.event_date)} · travel comp: ${g.travel_comp === "yes" ? "yes" : g.travel_comp === "no" ? "no" : "not set"}</div></td>` : ""}
         <td>${line(i)}</td>
         <td class="sm">${jobCell(i) || html`<span class="mute">—</span>`}</td>
         <td class="sm memo-c">${i.memo ? html`<span title="Memo from the Gusto timesheet">${i.memo}</span>` : html`<span class="mute">—</span>`}</td>
         ${canIgnore ? html`<td style="text-align:right;white-space:nowrap"><button class="btn sec small" title="Their time was approved and entered properly. Removes this line from the list."
-          onClick=${() => ignore(i)}>Ignore</button></td>` : ""}</tr>`))}</tbody>
+          onClick=${() => a.ignore([i], who(i))}>Ignore</button></td>` : ""}</tr>`))}</tbody>
     </table>
     ${edit && html`<div key="f" style="padding:12px 14px;border-top:1px solid var(--line-2);display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <button class="btn small" disabled=${!picked.length || busy} onClick=${draft}>${busy ? "Saving…" : `Draft emails in Gmail${picked.length ? ` (${picked.length})` : ""}`}</button>
-      <span class="xs mute">One email per person per event, explaining each ticked problem and how to fix it in Gusto. Venues missing travel compensation go to Japhy in one email. Drafts only: nothing is sent until Colson sends it.</span></div>`}`
+      <button class="btn small" disabled=${!a.picked.length || a.busy} onClick=${a.draft}>${a.busy ? "Saving…" : `Draft emails in Gmail${a.picked.length ? ` (${a.picked.length})` : ""}`}</button>
+      <span class="xs mute">One email per person per event, explaining each ticked problem and how to fix it in Gusto. Drafts only: nothing is sent until Colson sends it.</span></div>`}`
       : html`<div class="empty"><div class="t">Every timesheet checks out.</div></div>`}
-    ${undo && html`<div class="ts-undo" style="padding:10px 14px;border-top:1px solid var(--line-2);display:flex;gap:10px;align-items:center">
-      <span class="sm">Ignored ${who(undo)}.</span><button class="btn sec small" onClick=${() => ignore(undo, false)}>Undo</button></div>`}</div>
+    ${a.undoBar}</div>
+  </div>`;
+}
+
+// Salesforce fixes for Japhy: nothing is wrong with anyone's timesheet; Salesforce is missing what the app needs
+// to check it. One row per event and problem, with the crew it affects and what they entered that day.
+const SF_FIX = {
+  travel_comp_undetermined: "Set travel compensation on the Venue (yes or no). Until it's set, the app can't tell whether the crew's commute time should be paid.",
+  no_schedule: "Add the shift start and end on the staffing records, so on-site time can be checked against the schedule.",
+};
+function SalesforceFixes({ issues, shifts, user, onChanged, onOpenEvent }) {
+  const shiftsOf = useShiftsOf(shifts);
+  const a = useIssueActions(issues, user, onChanged);
+  const groups = {};
+  for (const i of a.shown) (groups[i.opportunity_sf_id + "|" + i.reason] ||= { ...i, key: i.opportunity_sf_id + "|" + i.reason, lines: [] }).lines.push(i);
+  const rows = Object.values(groups).sort((x, y) => (y.event_date || "").localeCompare(x.event_date || "") || (x.opportunity_name || "").localeCompare(y.opportunity_name || ""));
+  const edit = canEdit(user);
+  const canIgnore = !!user?.is_editor;
+  const label = (g) => `${(TS_REASON[g.reason] || { label: g.reason }).label} on ${g.opportunity_name}`;
+  const person = (i) => {
+    const byJob = {};
+    for (const x of shiftsOf[i.staffing_sf_id] || []) byJob[jobOf(x)] = (byJob[jobOf(x)] || 0) + workedH(x);
+    const parts = Object.entries(byJob).map(([j, h]) => `${hrs(Math.round(h * 10) / 10)} ${j}`);
+    return html`<div key=${i.issue_key} style="margin-bottom:2px"><span class="b">${i.person_name || "(unknown)"}</span>${parts.length ? html`<span class="mute"> · ${parts.join(" · ")}</span>` : ""}</div>`;
+  };
+  return html`<div>
+    <div class="sec-h"><h3>Salesforce fixes for Japhy</h3><span class="mute">Nothing is wrong with these timesheets. Salesforce is missing something the app needs to check them. Tick the ones to send, then press Draft email to Japhy. Press Ignore once it's fixed or doesn't matter.</span></div>
+    ${a.err && html`<div class="note red" style="margin-bottom:10px">${a.err}</div>`}
+    <div class="card flush">${rows.length ? html`<table key="t">
+      <thead><tr><th>Event</th><th>What to fix in Salesforce</th><th>Crew it affects (their Gusto entries)</th>${canIgnore ? html`<th></th>` : ""}</tr></thead>
+      <tbody>${rows.map((g) => {
+        const done = g.lines.every((i) => a.reqOf[i.issue_key]);
+        const on = done || g.lines.every((i) => a.sel[i.issue_key]);
+        return html`<tr key=${g.key}>
+        <td class="sm" style="vertical-align:top"><a onClick=${() => onOpenEvent(g.opportunity_sf_id)}>${g.opportunity_name}</a><div class="xs mute">${fmtDate(g.event_date)}</div></td>
+        <td style="vertical-align:top"><div style="display:flex;gap:8px;align-items:flex-start">
+          ${edit ? html`<input type="checkbox" style="margin-top:3px" disabled=${done} checked=${on} title=${done ? "Email already requested" : "Tick to include in the next email to Japhy"}
+            onChange=${(e) => a.setSel({ ...a.sel, ...Object.fromEntries(g.lines.map((i) => [i.issue_key, e.target.checked])) })}/>` : ""}
+          <div><span class="badge ${(TS_REASON[g.reason] || {}).cls || "grey"}">${(TS_REASON[g.reason] || { label: g.reason }).label}</span>${a.status(g.lines)}
+          <div class="xs mute" style="margin-top:2px">${SF_FIX[g.reason] || ""}</div></div></div></td>
+        <td class="sm" style="vertical-align:top">${g.lines.map(person)}</td>
+        ${canIgnore ? html`<td style="text-align:right;white-space:nowrap;vertical-align:top"><button class="btn sec small" title="Fixed in Salesforce, or it doesn't matter for this event. Removes this row."
+          onClick=${() => a.ignore(g.lines, label(g))}>Ignore</button></td>` : ""}</tr>`;
+      })}</tbody>
+    </table>
+    ${edit && html`<div key="f" style="padding:12px 14px;border-top:1px solid var(--line-2);display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <button class="btn small" disabled=${!a.picked.length || a.busy} onClick=${a.draft}>${a.busy ? "Saving…" : `Draft email to Japhy${a.picked.length ? ` (${new Set(a.picked.map((i) => i.opportunity_sf_id + i.reason)).size})` : ""}`}</button>
+      <span class="xs mute">One email listing every ticked event. Draft only: nothing is sent until Colson sends it.</span></div>`}`
+      : html`<div class="empty"><div class="t">Nothing to fix in Salesforce.</div></div>`}
+    ${a.undoBar}</div>
   </div>`;
 }
 
@@ -334,7 +391,9 @@ function Wages({ d, user, onChanged, onOpenEvent }) {
 
     <${Missing} rows=${missing} user=${user} onChanged=${onChanged} onOpenEvent=${onOpenEvent}/>
 
-    <${Timesheets} issues=${issues} shifts=${d.wageShifts || []} user=${user} onChanged=${onChanged} onOpenEvent=${onOpenEvent}/>
+    <${Timesheets} issues=${issues.filter((i) => i.audience !== "admin")} shifts=${d.wageShifts || []} user=${user} onChanged=${onChanged} onOpenEvent=${onOpenEvent}/>
+
+    <${SalesforceFixes} issues=${issues.filter((i) => i.audience === "admin")} shifts=${d.wageShifts || []} user=${user} onChanged=${onChanged} onOpenEvent=${onOpenEvent}/>
 
     <${Extras} bonuses=${bonuses} tips=${tips} user=${user} onChanged=${onChanged} onOpenEvent=${onOpenEvent}/>
 
