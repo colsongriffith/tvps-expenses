@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import * as esbuild from "esbuild";
 
 const SRC = "src/app", OUT = "deploy";
-const MODS = ["app", "common", "login", "list", "detail", "recon", "intro", "sync", "expenses"];
+const MODS = ["app", "common", "login", "list", "detail", "recon", "intro", "sync", "expenses", "wages"];
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT + "/app", { recursive: true });
 

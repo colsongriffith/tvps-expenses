@@ -22,6 +22,7 @@ const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 const SYNC_URL = SUPABASE_URL + "/functions/v1/sf-sync";
 const RAMP_SYNC_URL = SUPABASE_URL + "/functions/v1/ramp-sync";
+const WAGE_SYNC_URL = SUPABASE_URL + "/functions/v1/wage-sync";
 const SYNC_FROM = "2026-09-07"; // events before this are pre-tool and never sync
 
 const CATS = ["flights", "baggage", "hotels", "transportation", "per_diem", "other", "mileage"];
@@ -32,6 +33,9 @@ const SF_FIELD_LABEL = { flights: "Travel Expense – Flights", baggage: "Travel
 // best-guess Salesforce bucket from the finer category the matcher stored
 const FINE_TO_CAT = { flights: "flights", baggage: "baggage", hotels: "hotels", rental_car: "transportation", parking: "transportation", tolls: "transportation", rideshare: "transportation", taxi: "transportation", fuel: "transportation", per_diem: "per_diem", meals: "per_diem", groceries: "per_diem", mileage: "mileage", wifi_inflight: "other", carts: "other", supplies: "other", other: "other" };
 const guessCat = (l) => l.sf_category || FINE_TO_CAT[l.fine_category] || "other";
+
+const WAGE_FIELD_LABEL = { on_site_hours: "On-Site Hours", on_site_wages: "On-Site Wages", commute_hours: "Commuting Hours", commute_wages: "Commuting Wages" };
+const hrs = (h) => h == null ? "—" : Number(h).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + " h";
 
 const $ = (c) => c == null ? "—" : (c < 0 ? "-" : "") + "$" + (Math.abs(c) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const $0 = (c) => c ? $(c) : "";
@@ -112,7 +116,8 @@ async function all(table, order) {
 }
 
 async function loadAll() {
-  const [events, lines, crew, recon, syncQueue, syncFlags, sr, rr] = await Promise.all([
+  const [events, lines, crew, recon, syncQueue, syncFlags, sr, rr,
+         wageShifts, wageRecords, wageRates, wf, wr, timesheetIssues, missingTimesheets, reviewBonuses, tipShares] = await Promise.all([
     all("v_app_event", { col: "event_date", desc: true, then: "opportunity_sf_id" }),
     all("v_app_line", { col: "allocation_id" }),
     all("v_app_crew", { col: "staffing_sf_id" }),
@@ -121,9 +126,27 @@ async function loadAll() {
     all("v_app_sync_flag", { col: "id" }),
     sb.from("sf_sync_run").select("*").order("started_at", { ascending: false }).limit(15),
     sb.from("ramp_sync_run").select("*").order("started_at", { ascending: false }).limit(5),
+    all("v_app_wage_shift", { col: "work_date", then: "person_name" }),
+    all("v_app_wage_record", { col: "staffing_sf_id" }),
+    all("v_app_wage_rate", { col: "person_name" }),
+    sb.from("wage_sync_flag").select("*").is("resolved_at", null).order("created_at", { ascending: false }),
+    sb.from("wage_sync_run").select("*").order("started_at", { ascending: false }).limit(15),
+    all("v_app_timesheet_issue", { col: "issue_key" }),
+    all("v_app_missing_timesheet", { col: "event_date" }),
+    all("v_app_review_bonus", { col: "event_date" }),
+    all("v_app_tip_share", { col: "event_date" }),
   ]);
   if (sr.error) throw sr.error;
-  return { events, lines, crew, recon, syncQueue, syncFlags, syncRuns: sr.data, rampRuns: rr.error ? [] : rr.data };
+  return {
+    events, lines, crew, recon, syncQueue, syncFlags,
+    syncRuns: sr.data, rampRuns: rr.error ? [] : rr.data,
+    wageShifts, wageRecords, wageRates,
+    wageFlags: wf.error ? [] : wf.data,
+    wageRuns: wr.error ? [] : wr.data,
+    timesheetIssues, missingTimesheets, reviewBonuses, tipShares,
+    // one entry per staffing record with a timesheet problem (drives the Wages tab badge)
+    wageRateFlags: [...new Set(timesheetIssues.filter((i) => i.audience === "employee").map((i) => i.staffing_sf_id))],
+  };
 }
 
 // Every edit is an override row; the database places the charge and keeps the history.
@@ -144,6 +167,52 @@ async function runRampSync() {
   if (!r.ok && !b.status) throw new Error(b.error || "Ramp sync failed (" + r.status + ")");
   return b;
 }
+// Setting a role on a shift is an override row; the database re-prices it and keeps the history.
+async function saveWageRole(user, payload) {
+  const { error } = await sb.from("wage_role_override").insert({ decided_by: user.email, ...payload });
+  if (error) throw error;
+}
+
+// Ask for reminder emails. Claude drafts them in Colson's Gmail for review; nothing sends itself.
+async function requestReminders(user, rows) {
+  const { error } = await sb.from("timesheet_reminder").insert(rows.map((r) => ({
+    contact_sf_id: r.contact_sf_id, event_date: r.event_date, what: r.what, requested_by: user.email })));
+  if (error) throw error;
+}
+
+// Record that a review bonus or tip share went through payroll.
+async function markExtraPaid(user, kind, rows) {
+  const { error } = await sb.from("payroll_extra_paid").insert(rows.map((r) => ({
+    kind, opportunity_sf_id: r.opportunity_sf_id, contact_sf_id: r.contact_sf_id, amount_cents: r.amount_cents, marked_by: user.email })));
+  if (error) throw error;
+}
+
+// Tick or untick a wage record for the next Salesforce sync. Latest choice wins.
+async function setWageSyncChoice(user, staffingIds, sync) {
+  const { error } = await sb.from("wage_sync_choice").insert(staffingIds.map((id) => ({
+    staffing_sf_id: id, sync, decided_by: user.email })));
+  if (error) throw error;
+}
+
+// Ignore a "Timesheet not entered properly" line: the time was checked and is right. ignored=false undoes it.
+async function ignoreTimesheetIssues(user, issues, ignored = true) {
+  const { error } = await sb.from("timesheet_issue_ignore").insert(issues.map((i) => ({
+    issue_key: i.issue_key, ignored, staffing_sf_id: i.staffing_sf_id, wage_shift_id: i.wage_shift_id || null, reason: i.reason, decided_by: user.email })));
+  if (error) throw error;
+}
+
+async function runWageSync(dryRun = false) {
+  const { data } = await sb.auth.getSession();
+  const r = await fetch(WAGE_SYNC_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + data.session?.access_token, apikey: SUPABASE_ANON },
+    body: JSON.stringify({ dry_run: dryRun }),
+  });
+  const b = await r.json().catch(() => ({}));
+  if (!r.ok && !b.status) throw new Error(b.error || "Wage sync failed (" + r.status + ")");
+  return b;
+}
+
 // Anyone signed in with a TVPS email can pull charges and categorize them (Colson, 22 Oct).
 const canEdit = (u) => !!(u?.is_member || u?.is_editor);
 
@@ -191,4 +260,5 @@ export {
   $, $0, BASIS, Badge, CATS, CAT_HINT, CAT_LABEL, CAT_SHORT, FINE_TO_CAT, Help, Icon, React, SF_FIELD_LABEL, STATUS, SYNC_FROM, Src,
   basisText, daysAgoISO, eventStatusWords, fmtDate, fmtShort, fmtWhen, guessCat, html, isPast, lineStatus, loadAll, place,
   runSync, runRampSync, canEdit, saveOverride, sb, tileState, todayISO, useCallback, useEffect, useMemo, useRef, useState,
+  WAGE_FIELD_LABEL, hrs, saveWageRole, runWageSync, requestReminders, markExtraPaid, setWageSyncChoice, ignoreTimesheetIssues,
 };

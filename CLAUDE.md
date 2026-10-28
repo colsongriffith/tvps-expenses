@@ -33,6 +33,7 @@ Owner: Colson Griffith (The Vanity Portrait Studio). Design history and run logs
 - `allocation_override`: every human change. A trigger (`apply_allocation_override`) rewrites `allocation_current`.
   - Actions: `reassign`, `split`, `mark_overhead`, `unassign`, `remove`.
 - `staffing_snapshot`: Salesforce staffing records (event × person). `person` maps Ramp user UUIDs and Salesforce contacts.
+- Wages tab (`web/src/app/wages.js`): Gusto shifts → `wage_shift`/`wage_allocation`, priced and pushed by the `wage-sync` function. "Timesheet not entered properly" reads `v_app_timesheet_issue`; its Ignore button inserts into `timesheet_issue_ignore` (editors only, latest row per `issue_key` wins), and the view drops ignored lines.
 - `ramp_sync_run`, `sf_sync_run`: run logs. `sf_sync_ledger` / `sf_field_state`: what the app has written and the hand-edit detector.
 
 ## Things that bit us (keep in mind)
@@ -60,6 +61,7 @@ Owner: Colson Griffith (The Vanity Portrait Studio). Design history and run logs
 ## Deploying
 - Front end:
   - Vercel is git-linked to colsongriffith/tvps-expenses (since 22 Oct 2026): every push to `main` deploys to production.
+  - Keep `main` the source of truth. On 27 Oct production was found running an API deploy (Wages tab) that was never committed; it was copied back into `main` before the next push. Don't deploy by API without committing the same files.
   - Project settings (saved in Vercel): framework Other, root `web`, build `node build.mjs`, output `deploy`, install = default.
   - Run `cd web && node build.mjs && node e2e.mjs` before pushing; it must end with `ERRORS: none`.
   - After a push, fetch https://tvps-expenses.vercel.app/ and check it returns the app, not NOT_FOUND.

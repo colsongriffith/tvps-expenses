@@ -7,8 +7,9 @@ import { Reconcile } from "./recon.js";
 import { Intro } from "./intro.js";
 import { SyncPage, SyncButton } from "./sync.js";
 import { Expenses, buildCharges } from "./expenses.js";
+import { Wages } from "./wages.js";
 
-const TABS = ["expenses", "current", "past", "sync", "recon"];
+const TABS = ["expenses", "current", "past", "wages", "sync", "recon"];
 
 function App() {
   const [session, setSession] = useState(undefined);
@@ -76,8 +77,9 @@ function App() {
   const todoN = d ? buildCharges(d.lines).filter((c) => c.bucket === "todo").length : 0;
   const pastN = d ? d.events.filter((e) => isPast(e, cutoff)).length : 0;
   const syncN = d ? d.syncQueue.length + d.syncFlags.length : 0;
+  const wageN = d ? d.missingTimesheets.filter((r) => !r.reminder_status || r.reminder_status === "cancelled").length + d.wageRateFlags.length : 0;
   const last = d?.syncRuns?.[0];
-  const backLabel = { expenses: "Expenses", past: "Past events", sync: "Salesforce sync", recon: "Reconcile" }[from] || "Events";
+  const backLabel = { expenses: "Expenses", past: "Past events", wages: "Wages", sync: "Salesforce sync", recon: "Reconcile" }[from] || "Events";
   const on = (t) => tab === t && !opp ? "on" : "";
 
   return html`<div>
@@ -86,6 +88,7 @@ function App() {
         <button class=${on("expenses")} onClick=${() => go("expenses")} title="Every charge, newest first">Expenses${todoN ? html`<span class="n">${todoN}</span>` : ""}</button>
         <button class=${on("current")} onClick=${() => go("current")} title="Event totals: last 30 days and upcoming">Events</button>
         <button class=${on("past")} onClick=${() => go("past")} title="Events more than 30 days old">Past<span class="n">${pastN}</span></button>
+        <button class=${on("wages")} onClick=${() => go("wages")} title="Gusto hours and wages by person and event">Wages${wageN ? html`<span class="n">${wageN}</span>` : ""}</button>
         <button class=${on("sync")} onClick=${() => go("sync")} title="What goes to Salesforce, and anything flagged">Salesforce sync${syncN ? html`<span class="n">${syncN}</span>` : ""}</button>
         <button class=${on("recon")} onClick=${() => go("recon")} title="Where this app and Salesforce disagree">Reconcile</button>
       </div>
@@ -100,6 +103,7 @@ function App() {
         ${opp ? html`<${EventDetail} d=${d} oppId=${opp} onBack=${back} backLabel=${backLabel} user=${me} onChanged=${changed} onOpenExpenses=${openExpenses}/>`
           : tab === "expenses" ? html`<${Expenses} d=${d} user=${me} onChanged=${changed} onOpenEvent=${openEv} focusEvent=${focusEvent} clearFocus=${() => setFocusEvent(null)}/>`
           : tab === "recon" ? html`<${Reconcile} d=${d} onOpen=${openEv}/>`
+          : tab === "wages" ? html`<${Wages} d=${d} user=${me} onChanged=${changed} onOpenEvent=${openEv}/>`
           : tab === "sync" ? html`<${SyncPage} d=${d} user=${me} onOpen=${openEv} onDone=${changed}/>`
           : html`<${EventList} d=${d} onOpen=${openEv} mode=${tab} cutoff=${cutoff}/>`}
         <div class="foot">Ramp charges arrive each morning at 5:30 or on <b>Sync from Ramp</b>. Salesforce updates at 6am or on <b>Sync all</b>. ${!intro && html`<a onClick=${() => { showIntro(); go("expenses"); }}>How this works</a>`}</div>

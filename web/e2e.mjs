@@ -158,6 +158,26 @@ const bb = row("Blue Bottle");
 check(await bb.count() === 1 && await bb.evaluate((e) => e.classList.contains("conf-high")), "new charge appears in Not added with Claude's green guess");
 check(await page.locator(".ramp-sync .xs").textContent().then((t) => t.includes("by colson")), "last-pulled line shows who pressed it");
 
+// Wages: Ignore removes a "Timesheet not entered properly" line, Undo puts it back
+await page.locator(".top .seg button", { hasText: "Wages" }).click();
+await page.waitForSelector("h3:has-text('Timesheet not entered properly')");
+const tsCard = page.locator(".sec-h:has(h3:has-text('Timesheet not entered properly')) + .card");
+const tsRows = () => tsCard.locator("tbody tr");
+check(await tsRows().count() === 2, "two timesheet lines to fix");
+await tsRows().filter({ hasText: "Billy Cole" }).locator("button", { hasText: "Ignore" }).click();
+await page.waitForFunction(() => window.__ignores.length === 1);
+await page.waitForTimeout(300);
+const ig = await page.evaluate(() => window.__ignores[0]);
+check(ig.issue_key === "wrong_rate:W1" && ig.ignored === true && ig.decided_by === "colson@thevanityportraitstudio.com" && ig.wage_shift_id === "W1" && ig.staffing_sf_id === "S1", "Ignore records the line, who, and the shift");
+check(await tsRows().count() === 1 && await tsRows().filter({ hasText: "Billy Cole" }).count() === 0, "ignored line leaves the list");
+await page.locator(".ts-undo button", { hasText: "Undo" }).click();
+await page.waitForFunction(() => window.__ignores.length === 2);
+await page.waitForTimeout(300);
+check(await page.evaluate(() => window.__ignores[1].ignored === false), "Undo writes ignored=false");
+check(await tsRows().count() === 2, "Undo puts the line back");
+await page.locator(".top .seg button", { hasText: "Expenses" }).click();
+await page.waitForSelector("h2:has-text('Expenses')");
+
 // phone width
 await page.setViewportSize({ width: 390, height: 844 });
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
@@ -173,6 +193,9 @@ await p2.waitForSelector("h2:has-text('Expenses')");
 check(await p2.locator(".ramp-sync button").count() === 1, "member sees Sync from Ramp");
 check(await p2.locator("table.xtab button", { hasText: "Add to event" }).count() >= 1, "member can Add to event");
 check(await p2.locator(".top .sync-btn").count() === 0, "member does not get Salesforce Sync all");
+await p2.locator(".top .seg button", { hasText: "Wages" }).click();
+await p2.waitForSelector("h3:has-text('Timesheet not entered properly')");
+check(await p2.locator("button", { hasText: "Ignore" }).count() === 0, "member does not get Ignore (editors only)");
 await p2.close();
 
 await browser.close(); srv.close();

@@ -44,6 +44,16 @@ let flags = [{ id: "F1", staffing_sf_id: "S4", opportunity_sf_id: "E2", sf_categ
 let rampRuns = [{ id: "RR1", trigger: "daily", triggered_by: "schedule", status: "ok", started_at: "2026-10-21T12:37:00Z", finished_at: "2026-10-21T12:38:10Z", message: "Pulled 3 charges." }];
 const runs = [{ id: "R1", trigger: "daily", started_at: "2026-10-20T13:07:00Z", finished_at: "2026-10-20T13:07:05Z", status: "nothing_to_do", fields_written: 0, net_cents: 0, message: "Salesforce is already up to date." }];
 window.__overrides = [];
+window.__ignores = []; window.__emailReqs = [];
+const TS = [
+  { issue_key: "wrong_rate:W1", reason: "wrong_rate", audience: "employee", contact_sf_id: "C_billy", person_name: "Billy Cole", email: "billy@example.com", opportunity_sf_id: "E1", opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", event_date: "2026-10-10", staffing_sf_id: "S1", wage_shift_id: "W1", work_date: "2026-10-10", clock_in: "2026-10-10T16:00:00Z", clock_out: "2026-10-11T00:00:00Z", hours: 8, entered_rate_cents: 2500, expected_rate_cents: 4000, travel_comp: "yes", gusto_role_title: "Admin/Commute", memo: "Picked up gear at studio" },
+  { issue_key: "missing_commute:S2", reason: "missing_commute", audience: "employee", contact_sf_id: "C_kiki", person_name: "Kiki Dickie", email: "kiki@example.com", opportunity_sf_id: "E1", opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", event_date: "2026-10-10", staffing_sf_id: "S2", wage_shift_id: null, hours: 6, travel_comp: "yes", commute_minutes: 45, memo: null },
+];
+// latest ignore row per issue wins, like v_timesheet_issue_ignored
+function tsIssues() {
+  const last = {}; for (const g of window.__ignores) last[g.issue_key] = g.ignored;
+  return TS.filter((i) => !last[i.issue_key]);
+}
 
 const enrich = (r) => {
   const st = crew.find((c) => c.staffing_sf_id === r.staffing_sf_id);
@@ -108,17 +118,20 @@ rows = rows.map((r) => ({ ...r, allocated_cents: r.allocated_cents ?? r.line_cen
 
 class Q {
   constructor(t) { this.t = t; this.op = "select"; }
-  select() { return this; } order() { return this; } limit() { return this; } eq() { return this; } gte() { return this; } range() { return this; }
+  select() { return this; } order() { return this; } limit() { return this; } eq() { return this; } gte() { return this; } range() { return this; } is() { return this; } neq() { return this; } in() { return this; } lte() { return this; }
   insert(p) { this.op = "insert"; this.p = p; return this; }
   then(res, rej) {
     try {
       if (this.op === "insert") {
+        if (this.t === "timesheet_issue_ignore") { window.__ignores.push(...[].concat(this.p)); return res({ data: null, error: null }); }
+        if (this.t === "timesheet_email_request") { window.__emailReqs.push(...[].concat(this.p)); return res({ data: null, error: null }); }
         if (this.t !== "allocation_override") return res({ data: null, error: { message: "insert not allowed" } });
         const e = applyOverride(this.p); return res({ data: null, error: e });
       }
       const data = {
         v_app_event: events(), v_app_line: rows.map(enrich), v_app_crew: crew, v_app_reconciliation: [],
         v_app_sync_queue: queue(), v_app_sync_flag: flags, sf_sync_run: runs, ramp_sync_run: rampRuns,
+        v_app_timesheet_issue: tsIssues(), timesheet_email_request: window.__emailReqs.map((r) => ({ ...r, status: "requested" })),
       }[this.t];
       res({ data: data ?? [], error: null });
     } catch (e) { rej(e); }
