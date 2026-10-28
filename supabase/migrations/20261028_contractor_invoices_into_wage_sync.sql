@@ -1,4 +1,4 @@
--- STATUS: written 28 Oct 2026, NOT YET APPLIED (it changes the live wage sync; waiting for Colson's OK).
+-- Applied 28 Oct 2026 with Colson's OK (migration "contractor_invoices_into_wage_sync").
 -- Approved contractor invoices join the wage queue, so the normal wage sync (ticks, daily 6:37 push, flags)
 -- writes their totals to On_Site_Wages__c on the Day 1 record. Hours are not written for invoices.
 
