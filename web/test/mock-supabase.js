@@ -45,6 +45,16 @@ let rampRuns = [{ id: "RR1", trigger: "daily", triggered_by: "schedule", status:
 const runs = [{ id: "R1", trigger: "daily", started_at: "2026-10-20T13:07:00Z", finished_at: "2026-10-20T13:07:05Z", status: "nothing_to_do", fields_written: 0, net_cents: 0, message: "Salesforce is already up to date." }];
 window.__overrides = [];
 window.__ignores = []; window.__emailReqs = [];
+window.__ciCalls = [];
+const CI = [{ invoice_id: "INV1", contact_sf_id: "C_steph", vendor_name: "Stephanie Walker", invoice_no: "030", invoice_date: "2026-10-22", subtotal_cents: 34500, total_cents: 34500, lines_cents: 34500, hours: 5.75, math_ok: true, problems: [], status: "review", records: 1, matched_lines: 3, lines_to_check: 1 }];
+const CL = [
+  { line_id: "CL1", invoice_id: "INV1", invoice_no: "030", contact_sf_id: "C_steph", line_no: 1, work_date: "2026-10-10", description: "Roots Day 1", qty_hours: 2.5, unit_cents: 6000, total_cents: 15000, math_ok: true,
+    staffing_sf_id: "S3", opportunity_sf_id: "E1", opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", event_date: "2026-10-10", role: "Print Manager", target_staffing_sf_id: "S3", target_opportunity_sf_id: "E1", target_opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", target_event_date: "2026-10-10", match_score: 100, match_note: null },
+  { line_id: "CL2", invoice_id: "INV1", invoice_no: "030", contact_sf_id: "C_steph", line_no: 2, work_date: "2026-10-11", description: "Roots Day 2", qty_hours: 2, unit_cents: 6000, total_cents: 12000, math_ok: true,
+    staffing_sf_id: "S3", opportunity_sf_id: "E1", opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", event_date: "2026-10-10", role: "Print Manager", target_staffing_sf_id: "S3", target_opportunity_sf_id: "E1", target_opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", target_event_date: "2026-10-10", match_score: 70, match_note: "Salesforce has this event on Oct 10." },
+  { line_id: "CL3", invoice_id: "INV1", invoice_no: "030", contact_sf_id: "C_steph", line_no: 3, work_date: "2026-10-12", description: "Roots farewell", qty_hours: 1.25, unit_cents: 6000, total_cents: 7500, math_ok: true,
+    staffing_sf_id: "S3", opportunity_sf_id: "E1", opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", event_date: "2026-10-10", role: "Print Manager", target_staffing_sf_id: "S3", target_opportunity_sf_id: "E1", target_opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", target_event_date: "2026-10-10", match_score: 40, match_note: "Weak name match: check it." },
+];
 const TS = [
   { issue_key: "wrong_rate:W1", reason: "wrong_rate", audience: "employee", contact_sf_id: "C_billy", person_name: "Billy Cole", email: "billy@example.com", opportunity_sf_id: "E1", opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", event_date: "2026-10-10", staffing_sf_id: "S1", wage_shift_id: "W1", work_date: "2026-10-10", clock_in: "2026-10-10T16:00:00Z", clock_out: "2026-10-11T00:00:00Z", hours: 8, entered_rate_cents: 2500, expected_rate_cents: 4000, travel_comp: "yes", gusto_role_title: "Admin/Commute", memo: "Picked up gear at studio" },
   { issue_key: "missing_commute:S2", reason: "missing_commute", audience: "employee", contact_sf_id: "C_kiki", person_name: "Kiki Dickie", email: "kiki@example.com", opportunity_sf_id: "E1", opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", event_date: "2026-10-10", staffing_sf_id: "S2", wage_shift_id: null, hours: 6, travel_comp: "yes", commute_minutes: 45, memo: null },
@@ -139,7 +149,7 @@ class Q {
       const data = {
         v_app_event: events(), v_app_line: rows.map(enrich), v_app_crew: crew, v_app_reconciliation: [],
         v_app_sync_queue: queue(), v_app_sync_flag: flags, sf_sync_run: runs, ramp_sync_run: rampRuns,
-        v_app_timesheet_issue: tsIssues(), v_app_wage_shift: WS, timesheet_email_request: window.__emailReqs.map((r) => ({ ...r, status: "requested" })),
+        v_app_timesheet_issue: tsIssues(), v_app_contractor_invoice: CI.map((i) => ({ ...i, lines: CL.filter((l) => l.invoice_id === i.invoice_id).length })), v_app_contractor_line: CL, v_app_wage_shift: WS, timesheet_email_request: window.__emailReqs.map((r) => ({ ...r, status: "requested" })),
       }[this.t];
       res({ data: data ?? [], error: null });
     } catch (e) { rej(e); }
@@ -159,6 +169,11 @@ export function createClient() {
         const member = /[?&]as=member/.test(location.search);
         return { data: [{ email: member ? "kiki@thevanityportraitstudio.com" : "colson@thevanityportraitstudio.com", is_member: true, is_editor: !member, role: member ? "viewer" : "admin" }], error: null };
       }
+      if (name === "contractor_invoice_set_status") { const i = CI.find((x) => x.invoice_id === args.p_invoice); i.status = args.p_status; i.approved_by = "colson@thevanityportraitstudio.com"; i.approved_at = "2026-10-28T21:00:00Z"; window.__ciCalls.push([name, args]); return { data: null, error: null }; }
+      if (name === "contractor_line_set") { const l = CL.find((x) => x.line_id === args.p_line); const st = crew.find((c) => c.staffing_sf_id === args.p_staffing), tg = crew.find((c) => c.staffing_sf_id === args.p_target);
+        Object.assign(l, { staffing_sf_id: st.staffing_sf_id, opportunity_sf_id: st.opportunity_sf_id, opportunity_name: baseEvents.find((e) => e.opportunity_sf_id === st.opportunity_sf_id).opportunity_name, event_date: st.event_date,
+          target_staffing_sf_id: tg.staffing_sf_id, target_opportunity_sf_id: tg.opportunity_sf_id, target_opportunity_name: baseEvents.find((e) => e.opportunity_sf_id === tg.opportunity_sf_id).opportunity_name, target_event_date: tg.event_date, match_note: null });
+        window.__ciCalls.push([name, args]); return { data: null, error: null }; }
       if (name === "sf_sync_flag_accept") { flags = flags.filter((f) => f.id !== args.p_flag); return { data: null, error: null }; }
       return { data: null, error: { message: "unknown rpc " + name } };
     },

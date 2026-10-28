@@ -2,6 +2,7 @@ import {
   html, useState, useMemo, useEffect, sb, $, fmtDate, fmtWhen, canEdit, Help, Icon, Badge,
   WAGE_FIELD_LABEL, runWageSync, hrs, requestReminders, markExtraPaid, setWageSyncChoice, ignoreTimesheetIssues,
 } from "./common.js";
+import { ContractorInvoices } from "./contractor.js";
 
 const RUN_STATUS = {
   ok: { cls: "ok", label: "Synced" },
@@ -405,6 +406,9 @@ function Wages({ d, user, onChanged, onOpenEvent }) {
     <${SalesforceFixes} issues=${issues.filter((i) => i.audience === "admin")} shifts=${d.wageShifts || []} user=${user} onChanged=${onChanged} onOpenEvent=${onOpenEvent}/>
 
     <${Extras} bonuses=${bonuses} tips=${tips} user=${user} onChanged=${onChanged} onOpenEvent=${onOpenEvent}/>
+
+    <${ContractorInvoices} invoices=${d.contractorInvoices || []} lines=${d.contractorLines || []} crew=${d.crew || []} events=${d.events || []}
+      user=${user} onChanged=${onChanged} onOpenEvent=${onOpenEvent}/>
 
     ${unpriced.length > 0 && html`<div>
       <div class="sec-h"><h3>Can't price yet</h3><span class="mute">No status or Hourly Rate on the Salesforce Contact. Fill it in there and these price themselves.</span></div>

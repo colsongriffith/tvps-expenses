@@ -193,6 +193,24 @@ await sfRow.locator("button", { hasText: "Ignore" }).click();
 await page.waitForFunction(() => window.__ignores.length === 3);
 await page.waitForTimeout(300);
 check(await sfCard.locator("tbody tr").count() === 0, "Ignore removes the Salesforce fix row");
+// Contractor invoices: lines grouped under the Day 1 record, change a line, approve
+const ciCard = page.locator(".sec-h:has(h3:has-text('Contractor invoices')) + .card");
+check(await ciCard.count() === 1, "contractor invoice shows on the Wages tab");
+const ciText = await ciCard.textContent();
+check(ciText.includes("Invoice #030") && ciText.includes("Math checks out") && ciText.includes("Needs review") && ciText.includes("$345.00"), "invoice header: number, math check, status, total");
+check(await ciCard.locator("tr.ci-group").count() === 1 && await ciCard.locator("tr.ci-group").textContent().then((t) => t.includes("Goes on") && t.includes("$345.00")), "three days roll up to one Day 1 record with the summed amount");
+check(ciText.includes("Weak name match: check it."), "matcher notes are shown");
+await ciCard.locator("a", { hasText: "Change" }).first().click();
+await ciCard.locator(".ci-edit select").first().selectOption("S4");
+await ciCard.locator(".ci-edit button", { hasText: "Save" }).click();
+await page.waitForFunction(() => window.__ciCalls.length === 1);
+await page.waitForTimeout(300);
+check(await page.evaluate(() => JSON.stringify(window.__ciCalls[0]) === JSON.stringify(["contractor_line_set", { p_line: "CL1", p_staffing: "S4", p_target: "S3" }])), "Change saves the new record and keeps the Day 1 target");
+await ciCard.locator("button", { hasText: "Approve" }).click();
+await page.waitForFunction(() => window.__ciCalls.length === 2);
+await page.waitForTimeout(300);
+check(await ciCard.textContent().then((t) => t.includes("Approved") && t.includes("Back to review")), "Approve marks the invoice approved");
+
 await page.locator(".top .seg button", { hasText: "Expenses" }).click();
 await page.waitForSelector("h2:has-text('Expenses')");
 
@@ -214,6 +232,7 @@ check(await p2.locator(".top .sync-btn").count() === 0, "member does not get Sal
 await p2.locator(".top .seg button", { hasText: "Wages" }).click();
 await p2.waitForSelector("h3:has-text('Timesheet not entered properly')");
 check(await p2.locator("button", { hasText: "Ignore" }).count() === 0, "member does not get Ignore (editors only)");
+check(await p2.locator("button", { hasText: "Approve" }).count() === 0 && await p2.locator(".sec-h:has(h3:has-text('Contractor invoices'))").count() === 1, "member sees contractor invoices but can't approve");
 await p2.close();
 
 await browser.close(); srv.close();

@@ -117,7 +117,7 @@ async function all(table, order) {
 
 async function loadAll() {
   const [events, lines, crew, recon, syncQueue, syncFlags, sr, rr,
-         wageShifts, wageRecords, wageRates, wf, wr, timesheetIssues, missingTimesheets, reviewBonuses, tipShares] = await Promise.all([
+         wageShifts, wageRecords, wageRates, wf, wr, timesheetIssues, missingTimesheets, reviewBonuses, tipShares, contractorInvoices, contractorLines] = await Promise.all([
     all("v_app_event", { col: "event_date", desc: true, then: "opportunity_sf_id" }),
     all("v_app_line", { col: "allocation_id" }),
     all("v_app_crew", { col: "staffing_sf_id" }),
@@ -135,6 +135,8 @@ async function loadAll() {
     all("v_app_missing_timesheet", { col: "event_date" }),
     all("v_app_review_bonus", { col: "event_date" }),
     all("v_app_tip_share", { col: "event_date" }),
+    all("v_app_contractor_invoice", { col: "invoice_date", desc: true, then: "invoice_id" }),
+    all("v_app_contractor_line", { col: "invoice_id", then: "line_no" }),
   ]);
   if (sr.error) throw sr.error;
   return {
@@ -143,7 +145,7 @@ async function loadAll() {
     wageShifts, wageRecords, wageRates,
     wageFlags: wf.error ? [] : wf.data,
     wageRuns: wr.error ? [] : wr.data,
-    timesheetIssues, missingTimesheets, reviewBonuses, tipShares,
+    timesheetIssues, missingTimesheets, reviewBonuses, tipShares, contractorInvoices, contractorLines,
     // one entry per staffing record with a timesheet problem (drives the Wages tab badge)
     wageRateFlags: [...new Set(timesheetIssues.filter((i) => i.audience === "employee").map((i) => i.staffing_sf_id))],
   };
@@ -198,6 +200,16 @@ async function setWageSyncChoice(user, staffingIds, sync) {
 async function ignoreTimesheetIssues(user, issues, ignored = true) {
   const { error } = await sb.from("timesheet_issue_ignore").insert(issues.map((i) => ({
     issue_key: i.issue_key, ignored, staffing_sf_id: i.staffing_sf_id, wage_shift_id: i.wage_shift_id || null, reason: i.reason, decided_by: user.email })));
+  if (error) throw error;
+}
+
+// Contractor invoices: fix a line's staffing record / Day 1 record, or approve the invoice for the wage sync.
+async function setContractorLine(lineId, staffingId, targetId) {
+  const { error } = await sb.rpc("contractor_line_set", { p_line: lineId, p_staffing: staffingId, p_target: targetId });
+  if (error) throw error;
+}
+async function setContractorInvoiceStatus(invoiceId, status) {
+  const { error } = await sb.rpc("contractor_invoice_set_status", { p_invoice: invoiceId, p_status: status });
   if (error) throw error;
 }
 
@@ -260,5 +272,5 @@ export {
   $, $0, BASIS, Badge, CATS, CAT_HINT, CAT_LABEL, CAT_SHORT, FINE_TO_CAT, Help, Icon, React, SF_FIELD_LABEL, STATUS, SYNC_FROM, Src,
   basisText, daysAgoISO, eventStatusWords, fmtDate, fmtShort, fmtWhen, guessCat, html, isPast, lineStatus, loadAll, place,
   runSync, runRampSync, canEdit, saveOverride, sb, tileState, todayISO, useCallback, useEffect, useMemo, useRef, useState,
-  WAGE_FIELD_LABEL, hrs, saveWageRole, runWageSync, requestReminders, markExtraPaid, setWageSyncChoice, ignoreTimesheetIssues,
+  WAGE_FIELD_LABEL, hrs, saveWageRole, runWageSync, requestReminders, markExtraPaid, setWageSyncChoice, ignoreTimesheetIssues, setContractorLine, setContractorInvoiceStatus,
 };
