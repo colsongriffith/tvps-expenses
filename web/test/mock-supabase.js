@@ -53,9 +53,9 @@ const TS = [
 const WS = [
   { wage_shift_id: "W4", staffing_sf_id: "S3", work_date: "2026-10-10", clock_in: "2026-10-10T14:00:00Z", clock_out: "2026-10-10T15:00:00Z", minutes: 60, break_minutes: 0, gusto_role_title: null, rate_cents: 2500, person_name: "Stephanie Walker" },
   { wage_shift_id: "W5", staffing_sf_id: "S3", work_date: "2026-10-10", clock_in: "2026-10-10T15:00:00Z", clock_out: "2026-10-10T23:00:00Z", minutes: 480, break_minutes: 0, gusto_role_title: "Print Manager / Editor", rate_cents: 4000, person_name: "Stephanie Walker" },
-  { wage_shift_id: "W1", staffing_sf_id: "S1", work_date: "2026-10-10", clock_in: "2026-10-10T16:00:00Z", clock_out: "2026-10-11T00:00:00Z", minutes: 480, break_minutes: 0, gusto_role_title: null, rate_cents: 2500, person_name: "Billy Cole" },
-  { wage_shift_id: "W2", staffing_sf_id: "S2", work_date: "2026-10-10", clock_in: "2026-10-10T14:15:00Z", clock_out: "2026-10-10T15:00:00Z", minutes: 45, break_minutes: 0, gusto_role_title: null, rate_cents: 2500, person_name: "Kiki Dickie" },
-  { wage_shift_id: "W3", staffing_sf_id: "S2", work_date: "2026-10-10", clock_in: "2026-10-10T15:00:00Z", clock_out: "2026-10-10T21:30:00Z", minutes: 390, break_minutes: 30, gusto_role_title: "Photographer In-Training", rate_cents: 5000, person_name: "Kiki Dickie" },
+  { wage_shift_id: "W1", staffing_sf_id: "S1", work_date: "2026-10-10", clock_in: "2026-10-10T16:00:00Z", clock_out: "2026-10-11T00:00:00Z", minutes: 480, break_minutes: 0, gusto_role_title: null, rate_cents: 2500, equiv_hours: 8, memo: "Picked up gear at studio", person_name: "Billy Cole" },
+  { wage_shift_id: "W2", staffing_sf_id: "S2", work_date: "2026-10-10", clock_in: "2026-10-10T14:15:00Z", clock_out: "2026-10-10T15:00:00Z", minutes: 45, break_minutes: 0, gusto_role_title: null, rate_cents: 2500, equiv_hours: 0.75, memo: "Drive to Roots", person_name: "Kiki Dickie" },
+  { wage_shift_id: "W3", staffing_sf_id: "S2", work_date: "2026-10-10", clock_in: "2026-10-10T15:00:00Z", clock_out: "2026-10-10T21:30:00Z", minutes: 390, break_minutes: 30, gusto_role_title: "Photographer In-Training", rate_cents: 5000, equiv_hours: 6, memo: null, person_name: "Kiki Dickie" },
 ];
 // latest ignore row per issue wins, like v_timesheet_issue_ignored
 function tsIssues() {
