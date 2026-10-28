@@ -49,6 +49,11 @@ const TS = [
   { issue_key: "wrong_rate:W1", reason: "wrong_rate", audience: "employee", contact_sf_id: "C_billy", person_name: "Billy Cole", email: "billy@example.com", opportunity_sf_id: "E1", opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", event_date: "2026-10-10", staffing_sf_id: "S1", wage_shift_id: "W1", work_date: "2026-10-10", clock_in: "2026-10-10T16:00:00Z", clock_out: "2026-10-11T00:00:00Z", hours: 8, entered_rate_cents: 2500, expected_rate_cents: 4000, travel_comp: "yes", gusto_role_title: "Admin/Commute", memo: "Picked up gear at studio" },
   { issue_key: "missing_commute:S2", reason: "missing_commute", audience: "employee", contact_sf_id: "C_kiki", person_name: "Kiki Dickie", email: "kiki@example.com", opportunity_sf_id: "E1", opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", event_date: "2026-10-10", staffing_sf_id: "S2", wage_shift_id: null, hours: 6, travel_comp: "yes", commute_minutes: 45, memo: null },
 ];
+const WS = [
+  { wage_shift_id: "W1", staffing_sf_id: "S1", work_date: "2026-10-10", clock_in: "2026-10-10T16:00:00Z", clock_out: "2026-10-11T00:00:00Z", minutes: 480, break_minutes: 0, gusto_role_title: null, rate_cents: 2500, person_name: "Billy Cole" },
+  { wage_shift_id: "W2", staffing_sf_id: "S2", work_date: "2026-10-10", clock_in: "2026-10-10T14:15:00Z", clock_out: "2026-10-10T15:00:00Z", minutes: 45, break_minutes: 0, gusto_role_title: null, rate_cents: 2500, person_name: "Kiki Dickie" },
+  { wage_shift_id: "W3", staffing_sf_id: "S2", work_date: "2026-10-10", clock_in: "2026-10-10T15:00:00Z", clock_out: "2026-10-10T21:30:00Z", minutes: 390, break_minutes: 30, gusto_role_title: "Photographer In-Training", rate_cents: 5000, person_name: "Kiki Dickie" },
+];
 // latest ignore row per issue wins, like v_timesheet_issue_ignored
 function tsIssues() {
   const last = {}; for (const g of window.__ignores) last[g.issue_key] = g.ignored;
@@ -131,7 +136,7 @@ class Q {
       const data = {
         v_app_event: events(), v_app_line: rows.map(enrich), v_app_crew: crew, v_app_reconciliation: [],
         v_app_sync_queue: queue(), v_app_sync_flag: flags, sf_sync_run: runs, ramp_sync_run: rampRuns,
-        v_app_timesheet_issue: tsIssues(), timesheet_email_request: window.__emailReqs.map((r) => ({ ...r, status: "requested" })),
+        v_app_timesheet_issue: tsIssues(), v_app_wage_shift: WS, timesheet_email_request: window.__emailReqs.map((r) => ({ ...r, status: "requested" })),
       }[this.t];
       res({ data: data ?? [], error: null });
     } catch (e) { rej(e); }

@@ -109,7 +109,17 @@ const tz = (t) => t ? new Date(t).toLocaleTimeString("en-US", { hour: "numeric",
 // Timesheet not entered properly: one row per person and event, each problem on its own line with a tick box.
 // Ticked lines become email requests; Claude drafts them in Colson's Gmail (one email per person per event,
 // and one to Japhy for venues missing travel compensation). Nothing is sent automatically.
-function Timesheets({ issues, user, onChanged, onOpenEvent }) {
+// A Gusto job is required on every entry. Older loads stored the rate but not the title; the only $25/hr job is Admin/Commuting.
+const jobOf = (s) => s.gusto_role_title || (Number(s.rate_cents) === 2500 ? "Admin/Commuting" : s.rate_cents ? `${$(s.rate_cents)}/hr job` : "—");
+
+function Timesheets({ issues, shifts, user, onChanged, onOpenEvent }) {
+  // Record-level problems (commute missing, travel compensation not set…) aren't about one entry, so show every entry that day.
+  const shiftsOf = useMemo(() => {
+    const m = {};
+    for (const x of shifts || []) if (x.staffing_sf_id) (m[x.staffing_sf_id] ||= []).push(x);
+    for (const k in m) m[k].sort((a, b) => (a.clock_in || "").localeCompare(b.clock_in || ""));
+    return m;
+  }, [shifts]);
   const [sel, setSel] = useState({});
   const [reqs, setReqs] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -167,7 +177,16 @@ function Timesheets({ issues, user, onChanged, onOpenEvent }) {
       <div class="xs mute">${i.clock_in ? `${fmtDate(i.work_date)} ${tz(i.clock_in)}–${tz(i.clock_out)} · ${hrs(i.hours)}` : ""}
       ${i.entered_rate_cents != null && i.expected_rate_cents != null && i.entered_rate_cents !== i.expected_rate_cents ? ` · entered ${$(i.entered_rate_cents)}/hr, should be ${$(i.expected_rate_cents)}/hr` : ""}
       ${i.reason === "missing_commute" && i.commute_minutes ? ` · ${i.commute_minutes} min each way expected` : ""}
-      ${i.audience === "admin" ? " · email goes to Japhy" : ""}</div></div></div>`;
+      ${i.audience === "admin" ? " · email goes to Japhy" : ""}</div>
+      ${i.reason === "travel_comp_undetermined" ? html`<div class="xs" style="margin-top:2px">Nothing for ${(i.person_name || "them").split(" ")[0]} to fix: the Venue in Salesforce needs travel compensation set, so the app can tell whether their commute is paid.</div>` : ""}
+      ${!i.wage_shift_id && (shiftsOf[i.staffing_sf_id] || []).length ? html`<div class="xs" style="margin-top:4px">${shiftsOf[i.staffing_sf_id].map((x) => html`<div key=${x.wage_shift_id}>
+        ${fmtDate(x.work_date)} ${tz(x.clock_in)}–${tz(x.clock_out)} · ${hrs(Math.round((Number(x.minutes || 0) - Number(x.break_minutes || 0)) / 6) / 10)} · ${jobOf(x)}</div>`)}</div>` : ""}</div></div>`;
+  };
+  // Gusto job column: the entry's job, or every job used that day for record-level problems.
+  const jobCell = (i) => {
+    if (i.wage_shift_id) { const x = (shifts || []).find((y) => y.wage_shift_id === i.wage_shift_id); return x ? jobOf(x) : (i.gusto_role_title || null); }
+    const jobs = [...new Set((shiftsOf[i.staffing_sf_id] || []).map(jobOf))];
+    return jobs.length ? jobs.join(", ") : null;
   };
   return html`<div>
     <div class="sec-h"><h3>Timesheet not entered properly</h3><span class="mute">Fix these before payroll. Hover a reason to see why it was flagged. Tick the ones that need an email, then press Draft emails in Gmail. Press Ignore on a line once you've confirmed the time was approved and entered properly.</span></div>
@@ -178,7 +197,7 @@ function Timesheets({ issues, user, onChanged, onOpenEvent }) {
         ${n === 0 ? html`<td key="p" rowSpan=${g.lines.length} style="vertical-align:top"><div class="b">${g.person_name || "(unknown)"}</div><div class="xs mute">${g.email || ""}</div></td>
         <td key="e" rowSpan=${g.lines.length} class="sm" style="vertical-align:top"><a onClick=${() => onOpenEvent(g.opportunity_sf_id)}>${g.opportunity_name}</a><div class="xs mute">${fmtDate(g.event_date)} · travel comp: ${g.travel_comp === "yes" ? "yes" : g.travel_comp === "no" ? "no" : "not set"}</div></td>` : ""}
         <td>${line(i)}</td>
-        <td class="sm">${i.gusto_role_title || html`<span class="mute">—</span>`}</td>
+        <td class="sm">${jobCell(i) || html`<span class="mute">—</span>`}</td>
         <td class="sm memo-c">${i.memo ? html`<span title="Memo from the Gusto timesheet">${i.memo}</span>` : html`<span class="mute">—</span>`}</td>
         ${canIgnore ? html`<td style="text-align:right;white-space:nowrap"><button class="btn sec small" title="Their time was approved and entered properly. Removes this line from the list."
           onClick=${() => ignore(i)}>Ignore</button></td>` : ""}</tr>`))}</tbody>
@@ -315,7 +334,7 @@ function Wages({ d, user, onChanged, onOpenEvent }) {
 
     <${Missing} rows=${missing} user=${user} onChanged=${onChanged} onOpenEvent=${onOpenEvent}/>
 
-    <${Timesheets} issues=${issues} user=${user} onChanged=${onChanged} onOpenEvent=${onOpenEvent}/>
+    <${Timesheets} issues=${issues} shifts=${d.wageShifts || []} user=${user} onChanged=${onChanged} onOpenEvent=${onOpenEvent}/>
 
     <${Extras} bonuses=${bonuses} tips=${tips} user=${user} onChanged=${onChanged} onOpenEvent=${onOpenEvent}/>
 
