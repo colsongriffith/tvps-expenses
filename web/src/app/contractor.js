@@ -70,7 +70,9 @@ function Invoice({ inv, lines, crew, eventName, user, onChanged, onOpenEvent }) 
           ${g.opp ? html`<span><span class="xs mute">Goes on </span><a class="b" onClick=${() => onOpenEvent(g.opp)}>${g.name}</a><span class="xs mute"> · ${fmtDate(g.date)}${new Set(g.lines.map((l) => l.staffing_sf_id)).size > 1 ? ` · Day 1 of ${new Set(g.lines.map((l) => l.staffing_sf_id)).size}` : ""}</span></span>`
             : html`<span class="b" style="color:var(--bad)">Not matched to a staffing record</span>`}</td>
           <td class="money" style="background:var(--grey-bg)">${hrs(g.hours)}</td><td class="money b" style="background:var(--grey-bg)">${$(g.total)}</td>
-          <td class="xs mute" style="background:var(--grey-bg)">On-Site Wages</td></tr>
+          <td class="xs" style="background:var(--grey-bg)">${inv.status !== "approved" ? html`<span class="mute">On-Site Wages</span>`
+            : g.lines.every((l) => l.in_salesforce) ? html`<span class="badge ok" title=${"Written to On-Site Wages " + fmtWhen(g.lines[0].written_at)}>In Salesforce</span>`
+            : html`<span class="badge info" title="Approved. Goes to On-Site Wages with the next wage sync.">Next wage sync</span>`}</td></tr>
         ${g.lines.map((l) => html`<tr key=${l.line_id}>
           <td class="sm mute">${l.line_no}</td>
           <td class="sm" style="white-space:nowrap">${fmtShort(l.work_date)}</td>
@@ -98,12 +100,16 @@ function Invoice({ inv, lines, crew, eventName, user, onChanged, onOpenEvent }) 
 function ContractorInvoices({ invoices, lines, crew, events, user, onChanged, onOpenEvent }) {
   const names = useMemo(() => Object.fromEntries((events || []).map((e) => [e.opportunity_sf_id, e.opportunity_name])), [events]);
   const eventName = (id) => names[id] || id;
-  const shown = (invoices || []).filter((i) => i.status !== "void");
-  if (!shown.length) return null;
+  // Once every total on an approved invoice is in Salesforce, the invoice is done and leaves this section.
+  const done = (invoices || []).filter((i) => i.status === "approved" && i.in_salesforce);
+  const shown = (invoices || []).filter((i) => i.status !== "void" && !(i.status === "approved" && i.in_salesforce));
+  if (!shown.length && !done.length) return null;
   return html`<div>
     <div class="sec-h"><h3>Contractor invoices</h3><span class="mute">Each line is matched to her staffing record for that event. Multi-day programs roll up so the whole amount goes on the Day 1 record. Check the matches, then press Approve.</span></div>
     ${shown.map((inv) => html`<${Invoice} key=${inv.invoice_id} inv=${inv} lines=${(lines || []).filter((l) => l.invoice_id === inv.invoice_id)}
       crew=${crew || []} eventName=${eventName} user=${user} onChanged=${onChanged} onOpenEvent=${onOpenEvent}/>`)}
+    ${!shown.length && html`<div class="card"><div class="sm mute">No contractor invoices waiting.</div></div>`}
+    ${done.length > 0 && html`<div class="xs mute" style="margin:-6px 0 14px">${done.map((i) => `${i.vendor_name} #${i.invoice_no} (${$(i.total_cents)}, ${i.records} record${i.records === 1 ? "" : "s"})`).join("; ")}: in Salesforce since ${fmtDate(String(done[0].written_at || "").slice(0, 10))}, so ${done.length === 1 ? "it's" : "they're"} no longer listed.</div>`}
   </div>`;
 }
 

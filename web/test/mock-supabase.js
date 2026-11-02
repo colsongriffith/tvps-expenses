@@ -46,7 +46,8 @@ const runs = [{ id: "R1", trigger: "daily", started_at: "2026-10-20T13:07:00Z", 
 window.__overrides = [];
 window.__ignores = []; window.__emailReqs = [];
 window.__ciCalls = [];
-const CI = [{ invoice_id: "INV1", contact_sf_id: "C_steph", vendor_name: "Stephanie Walker", invoice_no: "030", invoice_date: "2026-10-22", subtotal_cents: 34500, total_cents: 34500, lines_cents: 34500, hours: 5.75, math_ok: true, problems: [], status: "review", records: 1, matched_lines: 3, lines_to_check: 1 }];
+const CI = [{ invoice_id: "INV0", contact_sf_id: "C_steph", vendor_name: "Stephanie Walker", invoice_no: "029", invoice_date: "2026-09-22", subtotal_cents: 12000, total_cents: 12000, lines_cents: 12000, hours: 2, math_ok: true, problems: [], status: "approved", records: 1, matched_lines: 0, lines_to_check: 0, written_records: 1, in_salesforce: true, written_at: "2026-09-30T13:37:00Z" },
+  { invoice_id: "INV1", contact_sf_id: "C_steph", vendor_name: "Stephanie Walker", invoice_no: "030", invoice_date: "2026-10-22", subtotal_cents: 34500, total_cents: 34500, lines_cents: 34500, hours: 5.75, math_ok: true, problems: [], status: "review", records: 1, matched_lines: 3, lines_to_check: 1 }];
 const CL = [
   { line_id: "CL1", invoice_id: "INV1", invoice_no: "030", contact_sf_id: "C_steph", line_no: 1, work_date: "2026-10-10", description: "Roots Day 1", qty_hours: 2.5, unit_cents: 6000, total_cents: 15000, math_ok: true,
     staffing_sf_id: "S3", opportunity_sf_id: "E1", opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", event_date: "2026-10-10", role: "Print Manager", target_staffing_sf_id: "S3", target_opportunity_sf_id: "E1", target_opportunity_name: "(NM) EP - HRTG - Roots 2026 Day 1", target_event_date: "2026-10-10", match_score: 100, match_note: null },

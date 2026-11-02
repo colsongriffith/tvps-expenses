@@ -210,6 +210,9 @@ await ciCard.locator("button", { hasText: "Approve" }).click();
 await page.waitForFunction(() => window.__ciCalls.length === 2);
 await page.waitForTimeout(300);
 check(await ciCard.textContent().then((t) => t.includes("Approved") && t.includes("Back to review")), "Approve marks the invoice approved");
+check(await ciCard.textContent().then((t) => t.includes("Next wage sync")), "approved totals not yet written say they go with the next wage sync");
+check(await page.locator(".card", { hasText: "Invoice #029" }).count() === 0, "an invoice already in Salesforce is not listed");
+check(await page.locator("text=#029 ($120.00, 1 record): in Salesforce since").count() === 1, "a one-line note says the written invoice left the list");
 
 await page.locator(".top .seg button", { hasText: "Expenses" }).click();
 await page.waitForSelector("h2:has-text('Expenses')");
