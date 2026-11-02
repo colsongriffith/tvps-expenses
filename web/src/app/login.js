@@ -7,6 +7,11 @@ function Login() {
   const [busy, setBusy] = useState(false);
   return html`<div class="center"><form class="card login" onSubmit=${async (e) => {
     e.preventDefault(); setErr(""); setBusy(true);
+    // Security audit 2026-10-23: `shouldCreateUser: false` would stop anyone with a random address from
+    // creating an auth user by requesting a link (they still cannot read data without a people row, but
+    // it is noise in auth.users). Trade-off: every staff member must be pre-created in Supabase Auth
+    // before their first sign-in, so leave it off until that is in place.
+    // const { error } = await sb.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: window.location.origin, shouldCreateUser: false } });
     const { error } = await sb.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: window.location.origin } });
     setBusy(false); error ? setErr(error.message) : setSent(true);
   }}>

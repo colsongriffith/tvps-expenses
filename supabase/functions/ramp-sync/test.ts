@@ -12,8 +12,8 @@ const T: Record<string, Row[]> = {
   sf_sync_secret: [{ name: "cron_key", value: "k" }],
   ramp_sync_run: [],
   person: [
-    { id: "p-billy", full_name: "Billy Cole", contact_sf_id: "C_billy", ramp_user_uuid: "u-billy", is_ops_buyer: false },
-    { id: "p-japhy", full_name: "Japhy Altenhein", contact_sf_id: "C_japhy", ramp_user_uuid: "u-japhy", is_ops_buyer: true },
+    { id: "p-billy", full_name: "Avery Example", contact_sf_id: "C_billy", ramp_user_uuid: "u-billy", is_ops_buyer: false },
+    { id: "p-japhy", full_name: "Japhy Example", contact_sf_id: "C_japhy", ramp_user_uuid: "u-japhy", is_ops_buyer: true },
   ],
   expense_line: [
     // already in the tool, placed by a person: memo + amount change must not move it
@@ -58,12 +58,12 @@ const respond = (b: unknown, req: Request) => {
 
 const rampPages = [
   { data: [
-    { id: "r-old", amount: 52.5, user_transaction_time: "2026-10-10T18:00:00Z", merchant_name: "Hilton", memo: "Roots hotel", card_holder: { user_id: "u-billy", first_name: "William", last_name: "Cole" }, state: "CLEARED", receipts: [] },
+    { id: "r-old", amount: 52.5, user_transaction_time: "2026-10-10T18:00:00Z", merchant_name: "Hilton", memo: "Roots hotel", card_holder: { user_id: "u-billy", first_name: "Avery", last_name: "Example" }, state: "CLEARED", receipts: [] },
     { id: "r-guess", amount: 18, user_transaction_time: "2026-10-12T18:00:00Z", merchant_name: "Uber", memo: "Airport to hotel, Roots", card_holder: { user_id: "u-billy" }, state: "CLEARED", receipts: ["x"] },
-    { id: "r-new1", amount: 23.45, user_transaction_time: "2026-10-15T02:30:00Z", merchant_name: "Chipotle", memo: "Per diem Roots", card_holder: { user_id: "u-billy", first_name: "William", last_name: "Cole" }, state: "PENDING", sk_category_name: "Restaurants", receipts: [] },
+    { id: "r-new1", amount: 23.45, user_transaction_time: "2026-10-15T02:30:00Z", merchant_name: "Chipotle", memo: "Per diem Roots", card_holder: { user_id: "u-billy", first_name: "Avery", last_name: "Example" }, state: "PENDING", sk_category_name: "Restaurants", receipts: [] },
   ], page: { next: "https://api.ramp.com/developer/v1/transactions?start=abc" } },
   { data: [
-    { id: "r-new2", amount: 301, user_transaction_time: "2026-10-01T18:00:00Z", merchant_name: "Southwest", memo: "Flights for Billy and Steph, Roots", card_holder: { user_id: "u-japhy" }, state: "CLEARED", receipts: [] },
+    { id: "r-new2", amount: 301, user_transaction_time: "2026-10-01T18:00:00Z", merchant_name: "Southwest", memo: "Flights for Avery and Blake, Roots", card_holder: { user_id: "u-japhy" }, state: "CLEARED", receipts: [] },
     { id: "r-new3", amount: 20, user_transaction_time: "2026-10-14T18:00:00Z", merchant_name: "Anthropic", memo: "Claude subscription", card_holder: { user_id: "u-japhy" }, state: "CLEARED" },
     { id: "r-new4", amount: 9.99, user_transaction_time: "2026-10-14T18:00:00Z", merchant_name: "Mystery Co", memo: null, card_holder: { user_id: "u-japhy" }, state: "CLEARED" },
     { id: "r-new5", amount: 40, user_transaction_time: "2026-10-14T18:00:00Z", merchant_name: "Bad Guess Inc", memo: "x", card_holder: { user_id: "u-billy" }, state: "CLEARED" },
@@ -87,8 +87,8 @@ globalThis.fetch = (async (input: Request | URL | string, init?: RequestInit) =>
     const lineOf = (ext: string) => T.expense_line.find((l) => l.external_id === ext)?.id;
     const pl = ids.map((id: string) => {
       const ext = T.expense_line.find((l) => l.id === id)?.external_id;
-      if (ext === "r-new1") return { charge_id: id, decision: "event", opportunity_sf_id: "E-roots", staffing_sf_ids: ["S-billy-roots"], category: "per_diem", fine_category: "meals", confidence: "high", reason: "Memo says per diem for Roots; Billy is on the crew." };
-      if (ext === "r-new2") return { charge_id: id, decision: "event", opportunity_sf_id: "E-roots", staffing_sf_ids: ["S-billy-roots", "S-steph-roots"], category: "flights", fine_category: "flights", confidence: "high", reason: "Memo names Billy and Steph for Roots." };
+      if (ext === "r-new1") return { charge_id: id, decision: "event", opportunity_sf_id: "E-roots", staffing_sf_ids: ["S-billy-roots"], category: "per_diem", fine_category: "meals", confidence: "high", reason: "Memo says per diem for Roots; Avery is on the crew." };
+      if (ext === "r-new2") return { charge_id: id, decision: "event", opportunity_sf_id: "E-roots", staffing_sf_ids: ["S-billy-roots", "S-steph-roots"], category: "flights", fine_category: "flights", confidence: "high", reason: "Memo names Avery and Blake for Roots." };
       if (ext === "r-new3") return { charge_id: id, decision: "overhead", confidence: "high", reason: "Software subscription." };
       if (ext === "r-guess") return { charge_id: id, decision: "event", opportunity_sf_id: "E-roots", staffing_sf_ids: ["S-billy-roots"], category: "transportation", fine_category: "rideshare", confidence: "high", reason: "Memo now names Roots." };
       if (ext === "r-new5") return { charge_id: id, decision: "event", opportunity_sf_id: "E-roots", staffing_sf_ids: ["S-not-on-crew"], category: "other", confidence: "high", reason: "Made-up staff id." };
@@ -100,7 +100,7 @@ globalThis.fetch = (async (input: Request | URL | string, init?: RequestInit) =>
   if (u.host === "db.test") {
     if (u.pathname.startsWith("/rest/v1/rpc/app_me")) {
       const auth = req.headers.get("Authorization") || "";
-      return respond([{ email: "kiki@thevanityportraitstudio.com", is_member: auth.includes("member"), is_editor: false }], req);
+      return respond([{ email: "test-staff@example.com", is_member: auth.includes("member"), is_editor: false }], req);
     }
     const table = u.pathname.replace("/rest/v1/", "");
     const rows = (T[table] ||= []);
@@ -154,11 +154,11 @@ assert(j.fetched === 7 && j.new_lines === 5, "7 usable charges (declined skipped
 const line = (ext: string) => T.expense_line.find((l) => l.external_id === ext)!;
 const active = (ext: string) => T.allocation_current.filter((a) => a.expense_line_id === line(ext).id && a.active);
 assert(!line("r-declined"), "declined charge not stored");
-assert(line("r-new1").txn_date === "2026-10-15" && line("r-new1").state === "pending" && line("r-new1").payer_name === "Billy Cole", "new line: UTC date, pending state, payer mapped by Ramp user id");
+assert(line("r-new1").txn_date === "2026-10-15" && line("r-new1").state === "pending" && line("r-new1").payer_name === "Avery Example", "new line: UTC date, pending state, payer mapped by Ramp user id");
 const n1 = active("r-new1");
-assert(n1.length === 1 && n1[0].status === "suggested" && n1[0].staffing_sf_id === "S-billy-roots" && n1[0].confidence === "high", "per diem suggested on Billy / Roots, green");
+assert(n1.length === 1 && n1[0].status === "suggested" && n1[0].staffing_sf_id === "S-billy-roots" && n1[0].confidence === "high", "per diem suggested on Avery / Roots, green");
 const n2 = active("r-new2");
-assert(n2.length === 2 && n2.reduce((s, a) => s + (a.amount_cents as number), 0) === 30100 && n2[0].amount_cents === 15050, "flights split across Billy + Steph to the cent");
+assert(n2.length === 2 && n2.reduce((s, a) => s + (a.amount_cents as number), 0) === 30100 && n2[0].amount_cents === 15050, "flights split across Avery + Blake to the cent");
 assert(active("r-new3")[0].status === "overhead" && line("r-new3").intent === "overhead", "subscription -> overhead");
 assert(active("r-new4")[0].status === "held" && active("r-new4")[0].confidence === "low", "unknown -> held, red");
 const n5 = active("r-new5")[0];
@@ -174,7 +174,7 @@ const prompt = String((claudeCalls[0].messages as Row[])[0].content);
 assert(!prompt.includes("Lost Gala"), "Closed Lost events never shown to Claude");
 assert(claudeCalls[0].model === "claude-sonnet-5-5" && ((claudeCalls[0].output_config as Row)?.format as Row)?.type === "json_schema" && !claudeCalls[0].tool_choice, "JSON structured output on the configured model");
 const run = T.ramp_sync_run.at(-1)!;
-assert(run.status === "ok" && run.triggered_by === "kiki@thevanityportraitstudio.com", "run logged with who pressed Sync");
+assert(run.status === "ok" && run.triggered_by === "test-staff@example.com", "run logged with who pressed Sync");
 
 // 4. second run: nothing new
 claudeCalls = [];
