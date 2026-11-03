@@ -118,7 +118,7 @@ const useShiftsOf = (shifts) => useMemo(() => {
   return m;
 }, [shifts]);
 
-// Shared by both problem lists: email requests (Claude drafts them in Gmail) and Ignore / Undo.
+// Shared by both problem lists: email requests (sent from Colson's Gmail via Zapier when queued) and Ignore / Undo.
 function useIssueActions(issues, user, onChanged) {
   const [sel, setSel] = useState({});
   const [reqs, setReqs] = useState([]);
@@ -153,14 +153,14 @@ function useIssueActions(issues, user, onChanged) {
         issue_key: i.issue_key, staffing_sf_id: i.staffing_sf_id, opportunity_sf_id: i.opportunity_sf_id, reason: i.reason, audience: i.audience, requested_by: user.email })));
       if (error) throw error;
       setSel({}); await load();
-      await onChanged(`${picked.length} email${picked.length === 1 ? "" : "s"} queued for Claude to draft in Colson's Gmail. Nothing is sent automatically.`);
+      await onChanged(`${picked.length} email${picked.length === 1 ? "" : "s"} sent from Colson's Gmail.`);
     } catch (e) { setErr(e.message || String(e)); }
     finally { setBusy(false); }
   };
   const status = (list) => {
     const r = list.map((i) => reqOf[i.issue_key]).find(Boolean);
     if (!r) return "";
-    return r.status === "drafted" ? html`<span class="badge ok" style="margin-left:6px">Draft in Gmail</span>` : html`<span class="badge info" style="margin-left:6px">Email queued</span>`;
+    return r.status === "drafted" ? html`<span class="badge ok" style="margin-left:6px">Email sent</span>` : html`<span class="badge info" style="margin-left:6px">Sending…</span>`;
   };
   const undoBar = undo && html`<div class="ts-undo" style="padding:10px 14px;border-top:1px solid var(--line-2);display:flex;gap:10px;align-items:center">
     <span class="sm">Ignored ${undo.label}.</span><button class="btn sec small" onClick=${() => ignore(undo.list, undo.label, false)}>Undo</button></div>`;
@@ -168,7 +168,7 @@ function useIssueActions(issues, user, onChanged) {
 }
 
 // Timesheet not entered properly: problems the employee fixes in Gusto. One row per person and event,
-// each problem on its own line. Ticked lines become email drafts in Colson's Gmail; nothing is sent automatically.
+// each problem on its own line. Ticked lines are emailed to the person from Colson's Gmail.
 function Timesheets({ issues, shifts, user, onChanged, onOpenEvent }) {
   const shiftsOf = useShiftsOf(shifts);
   const shiftById = useMemo(() => Object.fromEntries((shifts || []).map((x) => [x.wage_shift_id, x])), [shifts]);
@@ -195,7 +195,7 @@ function Timesheets({ issues, shifts, user, onChanged, onOpenEvent }) {
     const r = TS_REASON[i.reason] || { label: i.reason, cls: "grey" };
     const done = !!a.reqOf[i.issue_key];
     return html`<div style="display:flex;gap:8px;align-items:flex-start">
-      ${edit ? html`<input type="checkbox" style="margin-top:3px" disabled=${done} checked=${done || !!a.sel[i.issue_key]} title=${done ? "Email already requested" : "Tick to include in the next Gmail draft"}
+      ${edit ? html`<input type="checkbox" style="margin-top:3px" disabled=${done} checked=${done || !!a.sel[i.issue_key]} title=${done ? "Email already requested" : "Tick to include in the next email"}
         onChange=${(e) => a.setSel({ ...a.sel, [i.issue_key]: e.target.checked })}/>` : ""}
       <div><span class="badge ${r.cls}" title=${r.why || ""}>${r.label}</span>${a.status([i])}
       <div class="xs mute">${i.entered_rate_cents != null && i.expected_rate_cents != null && i.entered_rate_cents !== i.expected_rate_cents ? `Entered ${$(i.entered_rate_cents)}/hr, should be ${$(i.expected_rate_cents)}/hr` : ""}
@@ -208,7 +208,7 @@ function Timesheets({ issues, shifts, user, onChanged, onOpenEvent }) {
     : html`<span class="xs" style="color:var(--warn)" title="Every shift needs a memo saying what it was for">No memo</span>`;
   const top = { style: "vertical-align:top" };
   return html`<div>
-    <div class="sec-h"><h3>Timesheet not entered properly</h3><span class="mute">Fix these in Gusto before payroll. Hover a reason to see why it was flagged. Tick the ones that need an email, then press Draft emails in Gmail. Press Ignore on a line once you've confirmed the time was approved and entered properly.</span></div>
+    <div class="sec-h"><h3>Timesheet not entered properly</h3><span class="mute">Fix these in Gusto before payroll. Hover a reason to see why it was flagged. Tick the ones that need an email, then press Send emails. Press Ignore on a line once you've confirmed the time was approved and entered properly.</span></div>
     ${a.err && html`<div class="note red" style="margin-bottom:10px">${a.err}</div>`}
     <div class="card flush">${people.length ? html`<table key="t" class="ts-tab">
       <thead><tr><th>Person</th><th>Event</th><th>What's wrong</th><th>Gusto shifts</th><th>Memo in Gusto</th>${canIgnore ? html`<th></th>` : ""}</tr></thead>
@@ -222,8 +222,8 @@ function Timesheets({ issues, shifts, user, onChanged, onOpenEvent }) {
           onClick=${() => a.ignore([i], who(i))}>Ignore</button></td>` : ""}</tr>`)))}</tbody>
     </table>
     ${edit && html`<div key="f" style="padding:12px 14px;border-top:1px solid var(--line-2);display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <button class="btn small" disabled=${!a.picked.length || a.busy} onClick=${a.draft}>${a.busy ? "Saving…" : `Draft emails in Gmail${a.picked.length ? ` (${a.picked.length})` : ""}`}</button>
-      <span class="xs mute">One email per person per event, explaining each ticked problem and how to fix it in Gusto. Drafts only: nothing is sent until Colson sends it.</span></div>`}`
+      <button class="btn small" disabled=${!a.picked.length || a.busy} onClick=${a.draft}>${a.busy ? "Sending…" : `Send email${a.picked.length === 1 ? "" : "s"}${a.picked.length ? ` (${a.picked.length})` : ""}`}</button>
+      <span class="xs mute">One email per person per event, explaining each ticked problem and how to fix it in Gusto. Sent from Colson's Gmail as soon as you press the button.</span></div>`}`
       : html`<div class="empty"><div class="t">Every timesheet checks out.</div></div>`}
     ${a.undoBar}</div>
   </div>`;
@@ -251,7 +251,7 @@ function SalesforceFixes({ issues, shifts, user, onChanged, onOpenEvent }) {
     return html`<div key=${i.issue_key} style="margin-bottom:2px"><span class="b">${i.person_name || "(unknown)"}</span>${parts.length ? html`<span class="mute"> · ${parts.join(" · ")}</span>` : ""}</div>`;
   };
   return html`<div>
-    <div class="sec-h"><h3>Salesforce fixes for Japhy</h3><span class="mute">Nothing is wrong with these timesheets. Salesforce is missing something the app needs to check them. Tick the ones to send, then press Draft email to Japhy. Press Ignore once it's fixed or doesn't matter.</span></div>
+    <div class="sec-h"><h3>Salesforce fixes for Japhy</h3><span class="mute">Nothing is wrong with these timesheets. Salesforce is missing something the app needs to check them. Tick the ones to send, then press Send email to Japhy. Press Ignore once it's fixed or doesn't matter.</span></div>
     ${a.err && html`<div class="note red" style="margin-bottom:10px">${a.err}</div>`}
     <div class="card flush">${rows.length ? html`<table key="t">
       <thead><tr><th>Event</th><th>What to fix in Salesforce</th><th>Crew it affects (their Gusto entries)</th>${canIgnore ? html`<th></th>` : ""}</tr></thead>
@@ -271,8 +271,8 @@ function SalesforceFixes({ issues, shifts, user, onChanged, onOpenEvent }) {
       })}</tbody>
     </table>
     ${edit && html`<div key="f" style="padding:12px 14px;border-top:1px solid var(--line-2);display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <button class="btn small" disabled=${!a.picked.length || a.busy} onClick=${a.draft}>${a.busy ? "Saving…" : `Draft email to Japhy${a.picked.length ? ` (${new Set(a.picked.map((i) => i.opportunity_sf_id + i.reason)).size})` : ""}`}</button>
-      <span class="xs mute">One email listing every ticked event. Draft only: nothing is sent until Colson sends it.</span></div>`}`
+      <button class="btn small" disabled=${!a.picked.length || a.busy} onClick=${a.draft}>${a.busy ? "Sending…" : `Send email to Japhy${a.picked.length ? ` (${new Set(a.picked.map((i) => i.opportunity_sf_id + i.reason)).size})` : ""}`}</button>
+      <span class="xs mute">One email listing every ticked event. Sent from Colson's Gmail as soon as you press the button.</span></div>`}`
       : html`<div class="empty"><div class="t">Nothing to fix in Salesforce.</div></div>`}
     ${a.undoBar}</div>
   </div>`;
@@ -280,7 +280,7 @@ function SalesforceFixes({ issues, shifts, user, onChanged, onOpenEvent }) {
 
 const REMINDER = {
   requested: { cls: "info", label: "Reminder requested" },
-  drafted: { cls: "held", label: "Draft in Gmail" },
+  drafted: { cls: "ok", label: "Reminder sent" },
   sent: { cls: "ok", label: "Reminder sent" },
   resolved: { cls: "ok", label: "Resolved" },
   cancelled: { cls: "grey", label: "Cancelled" },
@@ -310,13 +310,13 @@ function Missing({ rows, user, onChanged, onOpenEvent }) {
   const picked = rows.filter((r) => sel[key(r)]);
   const ask = async () => {
     setBusy(true); setErr("");
-    try { await requestReminders(user, picked); setSel({}); await onChanged(`${picked.length} reminder${picked.length === 1 ? "" : "s"} requested. Claude will draft them in Colson's Gmail for review.`); }
+    try { await requestReminders(user, picked); setSel({}); await onChanged(`${picked.length} reminder${picked.length === 1 ? "" : "s"} sent from Colson's Gmail.`); }
     catch (e) { setErr(e.message || String(e)); }
     finally { setBusy(false); }
   };
   const through = rows[0]?.gusto_through;
   return html`<div>
-    <div class="sec-h"><h3>Missing timesheets</h3><span class="mute">Staffed in Salesforce, but no Gusto shift that day${through ? ` (Gusto loaded through ${fmtDate(through)})` : ""}. Review, tick, then request reminders.</span></div>
+    <div class="sec-h"><h3>Missing timesheets</h3><span class="mute">Staffed in Salesforce, but no Gusto shift that day${through ? ` (Gusto loaded through ${fmtDate(through)})` : ""}. Review, tick, then send reminders.</span></div>
     ${err && html`<div class="note red" style="margin-bottom:10px">${err}</div>`}
     <div class="card flush">${rows.length ? html`<table>
       <thead><tr><th></th><th>Date</th><th>Person</th><th>Staffed as</th><th>Gusto nearby</th><th>Status</th></tr></thead>
@@ -332,8 +332,8 @@ function Missing({ rows, user, onChanged, onOpenEvent }) {
         </tr>`;
       })}</tbody></table>
       ${canEdit(user) && open.length > 0 && html`<div style="padding:12px 14px;border-top:1px solid var(--line-2);display:flex;gap:12px;align-items:center">
-        <button class="btn small" disabled=${!picked.length || busy} onClick=${ask}>${busy ? "Saving…" : `Request reminder email${picked.length === 1 ? "" : "s"}${picked.length ? ` (${picked.length})` : ""}`}</button>
-        <span class="xs mute">Claude drafts each one in Colson's Gmail. Nothing is sent until Colson sends it.</span></div>`}`
+        <button class="btn small" disabled=${!picked.length || busy} onClick=${ask}>${busy ? "Sending…" : `Send reminder email${picked.length === 1 ? "" : "s"}${picked.length ? ` (${picked.length})` : ""}`}</button>
+        <span class="xs mute">Sent from Colson's Gmail as soon as you press the button.</span></div>`}`
       : html`<div class="empty"><div class="t">No missing timesheets.</div><div class="sm">Everyone staffed has a Gusto shift for that day.</div></div>`}</div>
   </div>`;
 }

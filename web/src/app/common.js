@@ -175,7 +175,7 @@ async function saveWageRole(user, payload) {
   if (error) throw error;
 }
 
-// Ask for reminder emails. Claude drafts them in Colson's Gmail for review; nothing sends itself.
+// Ask for reminder emails. A database trigger posts each one to Zapier, which sends it from Colson's Gmail.
 async function requestReminders(user, rows) {
   const { error } = await sb.from("timesheet_reminder").insert(rows.map((r) => ({
     contact_sf_id: r.contact_sf_id, event_date: r.event_date, what: r.what, requested_by: user.email })));

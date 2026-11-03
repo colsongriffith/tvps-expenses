@@ -186,9 +186,9 @@ check(await tsRows().filter({ hasText: "Stephanie Walker" }).count() === 0, "tra
 const sfRow = sfCard.locator("tbody tr");
 check(await sfRow.count() === 1 && await sfRow.textContent().then((t) => t.includes("Stephanie Walker") && t.includes("1.0 h Admin/Commuting") && t.includes("8.0 h Print Manager / Editor")), "Salesforce fixes for Japhy lists the event with the crew's Gusto entries by job");
 await sfRow.locator("input[type=checkbox]").check();
-await sfCard.locator("button", { hasText: "Draft email to Japhy" }).click();
+await sfCard.locator("button", { hasText: "Send email to Japhy" }).click();
 await page.waitForFunction(() => window.__emailReqs.length === 1);
-check(await page.evaluate(() => window.__emailReqs[0].audience === "admin" && window.__emailReqs[0].issue_key === "travel_comp_undetermined:S3"), "Draft email to Japhy queues the admin request");
+check(await page.evaluate(() => window.__emailReqs[0].audience === "admin" && window.__emailReqs[0].issue_key === "travel_comp_undetermined:S3"), "Send email to Japhy queues the admin request");
 await sfRow.locator("button", { hasText: "Ignore" }).click();
 await page.waitForFunction(() => window.__ignores.length === 3);
 await page.waitForTimeout(300);
