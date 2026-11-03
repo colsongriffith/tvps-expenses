@@ -98,6 +98,8 @@ const TS_REASON = {
     why: "The event qualifies for travel compensation, but commute was entered only before the gig or only after it." },
   mixed_entry: { label: "Drive and gig in one entry", who: "employee", cls: "warn",
     why: "One entry runs an hour or more outside the scheduled shift on a travel-eligible event. The drive should be its own Admin/Commute entry: drive, gig, drive." },
+  after_midnight: { label: "Shift after midnight", who: "employee", cls: "warn",
+    why: "Our workday runs until 4 am, so time between midnight and 4 am belongs to the day before. Move the whole day earlier in Gusto so it ends by 11:59 pm; otherwise Gusto splits the hours across two days and undercounts overtime." },
   no_on_site: { label: "No on-site time", who: "employee", cls: "bad",
     why: "Commute or admin time was entered for the event day, but no on-site shift." },
   travel_comp_undetermined: { label: "Travel compensation not set in Salesforce", who: "admin", cls: "bad",
