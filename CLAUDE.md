@@ -19,7 +19,7 @@ Owner: Colson Griffith (The Vanity Portrait Studio). Design history and run logs
 
 ## Data model (Supabase)
 - `expense_line`: one per charge. The unique key is `(source_id, external_id)`.
-  - Sources: Ramp `5941e287…`, Gusto, Capital One `e04b3a78…`, manual `7a3c9e10…`.
+  - Sources: Ramp `5941e287…`, Gusto `8d1a0b4c…`, Capital One `e04b3a78…`, manual `7a3c9e10…`.
   - `txn_date` is the UTC date of the card transaction.
 - `allocation_current`: where a charge sits, one row per share. Only `active` rows count. Rows are never deleted; they are deactivated.
   - `status` values:
@@ -35,6 +35,17 @@ Owner: Colson Griffith (The Vanity Portrait Studio). Design history and run logs
 - `staffing_snapshot`: Salesforce staffing records (event × person). `person` maps Ramp user UUIDs and Salesforce contacts.
 - Wages tab (`web/src/app/wages.js`): Gusto shifts → `wage_shift`/`wage_allocation`, priced and pushed by the `wage-sync` function. "Timesheet not entered properly" reads `v_app_timesheet_issue`; its Ignore button inserts into `timesheet_issue_ignore` (editors only, latest row per `issue_key` wins), and the view drops ignored lines.
 - Contractor invoices (`web/src/app/contractor.js`, Wages tab): `contractor_invoice` + `contractor_invoice_line`. Claude parses the PDF with `tools/contractor-invoice/parse_invoice.py`, then `select contractor_invoice_load(json)` matches each line to the contractor's staffing record and sets `target_staffing_sf_id` (the program's Day 1 record). Editors fix lines (`contractor_line_set`) and approve (`contractor_invoice_set_status`). `v_contractor_wage` sums approved lines per Day 1 record for On-Site Wages. Those rows join `v_wage_queue` (column `source` = 'invoice'), so the wage sync writes them like Gusto wages (On-Site Wages only, any event date).
+- Payroll prep is done in the Wages tab. There is no payroll Google Sheet any more. A Gusto sweep (skill `tvps-biweekly-payroll`; runbook in the project doc `claude/gusto-chrome-sweep-checklist.md`) runs in this order:
+  1. Salesforce pull into `staffing_snapshot`.
+  2. Gusto API diff.
+  3. Chrome pass for jobs and memos.
+  4. `copy_gusto_shifts(json)`, which also recomputes California OT.
+  5. Checks.
+- Shifts gone from Gusto: delete their `wage_allocation` rows and then the `wage_shift`. Keep a dismissed employee's paid shifts.
+- Staffing deleted in Salesforce: set `stage = 'Deleted in Salesforce'`.
+- 4 am day cutoff: a Gusto entry that starts 12:00–4:00 am is flagged `after_midnight`. The whole day has to move earlier in Gusto so it ends by 11:59 pm.
+- Timesheet emails: tick in the app → `timesheet_reminder` / `timesheet_email_request` → trigger `push_timesheet_drafts()` → Zapier → Colson's Gmail.
+- Gusto reimbursements come from Colson's screenshots (skill `gusto-reimbursement-review`). They load as `expense_line` rows with source `8d1a0b4c…` and external ids `gusto-scr-<date>-…`, each with a `suggested` (or `overhead`) allocation.
 - `ramp_sync_run`, `sf_sync_run`: run logs. `sf_sync_ledger` / `sf_field_state`: what the app has written and the hand-edit detector.
 
 ## Things that bit us (keep in mind)
