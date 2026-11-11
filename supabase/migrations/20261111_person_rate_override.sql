@@ -7,7 +7,8 @@
 
 create table if not exists public.person_rate_override (
   contact_sf_id text not null,
-  status text not null check (status in ('In Training','Lead','Senior')),
+  -- '*' = applies whatever the status (used when the contact has no statuses in Salesforce)
+  status text not null default '*' check (status in ('In Training','Lead','Senior','*')),
   rate_cents bigint not null check (rate_cents > 0),
   note text,
   decided_by text,
@@ -24,9 +25,14 @@ values ('0035a00002msrNkAAI', 'Senior', 8000,
         'colson@thevanityportraitstudio.com')
 on conflict (contact_sf_id, status) do update set rate_cents = excluded.rate_cents, note = excluded.note;
 
--- Alex Akamine (0035a00002hK9JBAA0) also has a unique rate. It isn't added yet because
--- the rate needs confirming: Gusto has $125 (Lead Photographer - On-Site Rate), while
--- Salesforce Hourly Rate is $150 and his statuses are blank.
+-- Alex Akamine: unique on-site rate, taken from Gusto (Colson, 11 Nov 2026).
+-- Gusto "Lead Photographer - On-Site Rate" = $125/hr. His Salesforce statuses are blank,
+-- so this applies whatever the status, and replaces the $150 Salesforce Hourly Rate fallback.
+insert into public.person_rate_override (contact_sf_id, status, rate_cents, note, decided_by)
+values ('0035a00002hK9JBAA0', '*', 12500,
+        'Alex Akamine: unique on-site rate $125/hr, from Gusto (Colson, 11 Nov 2026). On-site only; admin/commute still $25.',
+        'colson@thevanityportraitstudio.com')
+on conflict (contact_sf_id, status) do update set rate_cents = excluded.rate_cents, note = excluded.note;
 
 create or replace function public.expected_rate_cents(p_role text, p_bucket text, p_contact text, p_staffing text)
  returns bigint
@@ -40,6 +46,8 @@ as $function$
       (select coalesce(
                 (select o.rate_cents from person_rate_override o
                   where o.contact_sf_id = p_contact and o.status = x.s),
+                (select o.rate_cents from person_rate_override o
+                  where o.contact_sf_id = p_contact and o.status = '*'),
                 case x.s when 'In Training' then 5000 when 'Lead' then 6000 when 'Senior' then 7500 end)
        from (select case
                when p_role in ('TVPS Photographer','Editor','Print Manager') then c.tvps_status
